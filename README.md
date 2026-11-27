@@ -31,13 +31,14 @@ Fill in [`public/SKU-setup-template.xlsx`](public/SKU-setup-template.xlsx)
 (also downloadable from the Import screen), one row per SKU, then upload it on
 **Import spreadsheet**. The app checks every row, shows what it found, and saves
 nothing until you press Import. Rows are matched by Amazon SKU, so uploading
-again updates SKUs instead of adding copies. Each import also records the
-"Warehouse on hand (units)" column as a warehouse count.
+again updates SKUs instead of adding copies. A filled-in "Warehouse on hand
+(units)" cell is recorded as a warehouse count; leave it blank if you have not
+counted yet. Counts can also be typed on each SKU's edit screen.
 
 Required columns: Listing, Amazon SKU, In-house SKU, Units per case,
-Tie (cases per layer), High (layers), Max cases per pallet,
-Warehouse on hand (units). Optional: Product description, Warehouse location,
-ASIN, Count date, Notes.
+Tie (cases per layer), High (layers), Max cases per pallet. Optional:
+Warehouse on hand (units), Product description, Warehouse location, ASIN,
+Count date, Notes.
 
 ## For developers
 

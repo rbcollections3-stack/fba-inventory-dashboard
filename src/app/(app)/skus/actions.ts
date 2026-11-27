@@ -6,7 +6,7 @@ import { getDb } from "@/db";
 import { requireAdmin } from "@/lib/auth/session";
 import { checkSkuSheet, recheckRows, type RowIssue, type SkuImportRow } from "@/lib/skus/parse";
 import { readSpreadsheet, UnreadableFileError } from "@/lib/skus/read-file";
-import { importSkus, planImport, saveSku, skuFormSchema } from "@/lib/skus/repo";
+import { importSkus, planImport, recordCount, saveSku, skuFormSchema } from "@/lib/skus/repo";
 
 export type SkuFormState = { error?: string; fieldErrors?: Record<string, string> };
 
@@ -15,7 +15,18 @@ export async function saveSkuAction(
   _prev: SkuFormState,
   formData: FormData,
 ): Promise<SkuFormState> {
-  await requireAdmin();
+  const user = await requireAdmin();
+  const countText = String(formData.get("countUnits") ?? "").trim().replace(/,/g, "");
+  let countUnits: number | null = null;
+  if (countText !== "") {
+    countUnits = Number(countText);
+    if (!/^\d+$/.test(countText) || !Number.isSafeInteger(countUnits)) {
+      return {
+        error: "Please fix the highlighted fields.",
+        fieldErrors: { countUnits: "Enter a whole number of units, 0 or more, or leave it blank." },
+      };
+    }
+  }
   const raw = Object.fromEntries(
     [
       "listing",
@@ -42,6 +53,13 @@ export async function saveSkuAction(
   }
   const result = await saveSku(getDb(), id, parsed.data);
   if (!result.ok) return { error: result.error };
+  if (countUnits !== null) {
+    await recordCount(getDb(), result.id, countUnits, {
+      userId: user.id,
+      countedOn: new Date().toISOString().slice(0, 10),
+    });
+    revalidatePath("/warehouse");
+  }
   revalidatePath("/skus");
   redirect("/skus");
 }

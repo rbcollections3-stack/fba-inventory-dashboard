@@ -67,6 +67,23 @@ describe("checkSkuSheet", () => {
     expect(res.errors[0].message).toContain('"Units per case"');
   });
 
+  it("warns about a bad ASIN and leaves it blank instead of blocking the import", () => {
+    const row = [...good];
+    row[10] = "B0BHFDQKMPv";
+    const res = checkSkuSheet(table([row]));
+    expect(res.errors).toEqual([]);
+    expect(res.rows[0].asin).toBeNull();
+    expect(res.warnings[0].message).toMatch(/"B0BHFDQKMPV" \(11 characters\)/);
+  });
+
+  it("trims SKUs (including stray newlines) but keeps their inner spaces, and reads numeric SKUs as text", () => {
+    const row = [...good];
+    row[1] = "\n  k2 - bambo-stickerless  ";
+    row[2] = 7004;
+    const res = checkSkuSheet(table([row]));
+    expect(res.rows[0]).toMatchObject({ amazonSku: "k2 - bambo-stickerless", inhouseSku: "7004" });
+  });
+
   it("explains an empty sheet", () => {
     const res = checkSkuSheet(table([[], []]));
     expect(res.errors[0].message).toMatch(/no SKU rows/);
@@ -85,18 +102,22 @@ describe("checkSkuSheet", () => {
       "3: High (layers) must be at least 1, but it says 0.",
       '3: Max cases per pallet must be a whole number, but it says "x".',
       "3: Warehouse on hand (units) cannot be negative.",
-      '3: ASIN must be 10 letters and numbers, such as B0ABC12345, but it says "B0SHORT".',
       '3: Count date must be a date such as 2026-11-27, but it says "next week".',
     ]);
   });
 
-  it("requires the warehouse on hand count but accepts zero", () => {
+  it("accepts zero or a blank warehouse count (not counted yet), but not a bad one", () => {
     const zero = [...good];
     zero[7] = 0;
     expect(checkSkuSheet(table([zero])).rows[0].warehouseOnHand).toBe(0);
     const blank = [...good];
     blank[7] = null;
-    expect(checkSkuSheet(table([blank])).errors[0].message).toBe("Warehouse on hand (units) is empty.");
+    const res = checkSkuSheet(table([blank]));
+    expect(res.errors).toEqual([]);
+    expect(res.rows[0].warehouseOnHand).toBeNull();
+    const bad = [...good];
+    bad[7] = "lots";
+    expect(checkSkuSheet(table([bad])).errors[0].message).toBe('Warehouse on hand (units) must be a whole number, but it says "lots".');
   });
 
   it("accepts numbers typed as text, with thousands commas", () => {

@@ -4,7 +4,7 @@ import type { Db } from "@/db";
 import { listings, skus, warehouseCounts } from "@/db/schema";
 import { checkSkuSheet, type SkuImportRow } from "@/lib/skus/parse";
 import { readSpreadsheet } from "@/lib/skus/read-file";
-import { groupByListing, importSkus, listSkus, planImport, saveSku, skuFormSchema } from "@/lib/skus/repo";
+import { getSku, groupByListing, importSkus, listSkus, planImport, recordCount, saveSku, skuFormSchema } from "@/lib/skus/repo";
 import { readFixture, SAMPLE_CSV_PATH } from "../helpers";
 import { clearData, freshDb, TEST_DATABASE_URL } from "./db";
 
@@ -72,6 +72,16 @@ describe.skipIf(!TEST_DATABASE_URL)("SKU import and editing (database)", () => {
     expect(updated).toMatchObject({ unitsPerCase: 99, warehouseOnHand: 5, countedOn: "2026-12-01" });
   });
 
+  it("imports rows with a blank warehouse count without recording a count, then a later import adds the count", async () => {
+    const rows = (await sampleRows()).map((r) => ({ ...r, warehouseOnHand: null, countDate: null }));
+    expect(await importSkus(db, rows, opts)).toEqual({ ok: true, created: 21, updated: 0 });
+    expect(await n(db, warehouseCounts)).toBe(0);
+    expect((await listSkus(db))[0]).toMatchObject({ warehouseOnHand: null, countedOn: null });
+    await importSkus(db, rows.map((r) => ({ ...r, warehouseOnHand: 12 })), { ...opts, today: "2026-11-28" });
+    expect(await n(db, warehouseCounts)).toBe(21);
+    expect((await listSkus(db))[0]).toMatchObject({ warehouseOnHand: 12, countedOn: "2026-11-28" });
+  });
+
   it("refuses an in-house SKU that already belongs to another Amazon SKU, and saves nothing", async () => {
     const rows = await sampleRows();
     await importSkus(db, rows.slice(0, 2), opts);
@@ -135,6 +145,8 @@ describe.skipIf(!TEST_DATABASE_URL)("SKU import and editing (database)", () => {
     expect(await saveSku(db, created.id, { ...form, tie: 8, listing: "Jars" })).toEqual({ ok: true, id: created.id });
     const list = await listSkus(db);
     expect(list.find((s) => s.id === created.id)).toMatchObject({ tie: 8, listingName: "Jars", warehouseOnHand: null });
+    await recordCount(db, created.id, 42, { userId: null, countedOn: "2026-11-28" });
+    expect(await getSku(db, created.id)).toMatchObject({ warehouseOnHand: 42, countedOn: "2026-11-28" });
     expect(await saveSku(db, 9999, form)).toEqual({ ok: false, error: 'Amazon SKU "RB-1" already exists.' });
   });
 

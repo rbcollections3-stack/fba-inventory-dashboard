@@ -115,6 +115,14 @@ test("admin edits a SKU's pallet details", async () => {
   await expect(page).toHaveURL(/\/skus$/);
   const row = page.getByTestId("sku-row").filter({ hasText: "EX-TOTE-BLK" });
   await expect(row.locator("td").nth(4)).toHaveText("7");
+
+  // Typing a new warehouse count records it.
+  await page.getByRole("link", { name: "EX-TOTE-BLK" }).click();
+  await page.getByLabel("New warehouse count (units)").fill("1234");
+  await page.getByRole("button", { name: "Save SKU" }).click();
+  await expect(page).toHaveURL(/\/skus$/);
+  await page.getByRole("link", { name: "EX-TOTE-BLK" }).click();
+  await expect(page.getByText(/Warehouse on hand: 1,234 units/)).toBeVisible();
 });
 
 test("warehouse staff only see the warehouse screen", async ({ browser }) => {

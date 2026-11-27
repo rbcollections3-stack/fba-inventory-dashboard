@@ -11,7 +11,7 @@ export const SKU_COLUMNS = [
   { key: "tie", header: "Tie (cases per layer)", required: true },
   { key: "high", header: "High (layers)", required: true },
   { key: "maxCasesPerPallet", header: "Max cases per pallet", required: true },
-  { key: "warehouseOnHand", header: "Warehouse on hand (units)", required: true },
+  { key: "warehouseOnHand", header: "Warehouse on hand (units)", required: false },
   { key: "description", header: "Product description", required: false },
   { key: "warehouseLocation", header: "Warehouse location", required: false },
   { key: "asin", header: "ASIN", required: false },

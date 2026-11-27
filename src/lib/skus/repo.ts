@@ -169,13 +169,15 @@ export async function importSkus(
           skuId = ins.id;
           created++;
         }
-        await tx.insert(warehouseCounts).values({
-          skuId,
-          units: r.warehouseOnHand,
-          countedOn: r.countDate ?? opts.today,
-          source: "import",
-          createdBy: opts.userId,
-        });
+        if (r.warehouseOnHand !== null) {
+          await tx.insert(warehouseCounts).values({
+            skuId,
+            units: r.warehouseOnHand,
+            countedOn: r.countDate ?? opts.today,
+            source: "import",
+            createdBy: opts.userId,
+          });
+        }
       }
       return { ok: true as const, created, updated };
     });
@@ -288,6 +290,22 @@ export async function saveSku(db: Db, id: number | null, v: SkuFormValues): Prom
     if (isUniqueViolation(err)) return { ok: false, error: "That Amazon SKU or in-house SKU is already in use." };
     throw err;
   }
+}
+
+/** Records a warehouse count typed in by hand. */
+export async function recordCount(
+  db: Db,
+  skuId: number,
+  units: number,
+  opts: { userId: number | null; countedOn: string },
+): Promise<void> {
+  await db.insert(warehouseCounts).values({
+    skuId,
+    units,
+    countedOn: opts.countedOn,
+    source: "manual",
+    createdBy: opts.userId,
+  });
 }
 
 export async function getSku(db: Db, id: number): Promise<SkuWithStock | null> {

@@ -19,7 +19,9 @@ export default async function ImportPage() {
         </ol>
         <p className="muted small" style={{ marginTop: 12, marginBottom: 0 }}>
           SKUs are matched by Amazon SKU, so uploading the sheet again updates existing SKUs instead of adding
-          copies. Each import also records the &quot;Warehouse on hand&quot; number as a new warehouse count.
+          copies. A filled-in &quot;Warehouse on hand&quot; number is recorded as a new warehouse count. Leave it
+          blank if you have not counted yet: import again later with the counts, or type each count on the SKU&apos;s
+          edit screen.
         </p>
       </div>
       <div className="card">

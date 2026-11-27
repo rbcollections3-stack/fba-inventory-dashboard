@@ -25,7 +25,8 @@ export const skuImportRowSchema = z.object({
   tie: z.number().int().min(1),
   high: z.number().int().min(1),
   maxCasesPerPallet: z.number().int().min(1),
-  warehouseOnHand: z.number().int().min(0),
+  /** Blank means "not counted yet": no warehouse count is recorded. */
+  warehouseOnHand: z.number().int().min(0).nullable(),
   description: z.string().max(500).nullable(),
   warehouseLocation: z.string().max(200).nullable(),
   asin: z
@@ -176,15 +177,17 @@ export function checkSkuSheet(table: SheetTable): ImportCheck {
     if (!used) continue;
 
     const issues: string[] = [];
-    const requiredText = (key: SkuColumnKey): string => {
-      const t = cellText(get(cells, key)).replace(/\s+/g, " ");
+    // SKUs are only trimmed: inner spaces are kept so they match Seller Central exactly.
+    const requiredText = (key: SkuColumnKey, keepInnerSpaces = false): string => {
+      const raw = cellText(get(cells, key));
+      const t = keepInnerSpaces ? raw : raw.replace(/\s+/g, " ");
       if (t === "") issues.push(`${LABEL[key]} is empty.`);
       return t;
     };
 
     const listing = requiredText("listing");
-    const amazonSku = requiredText("amazonSku");
-    const inhouseSku = requiredText("inhouseSku");
+    const amazonSku = requiredText("amazonSku", true);
+    const inhouseSku = requiredText("inhouseSku", true);
     const unitsPerCase = readWholeNumber(get(cells, "unitsPerCase"), "unitsPerCase", 1, issues);
     const tie = readWholeNumber(get(cells, "tie"), "tie", 1, issues);
     const high = readWholeNumber(get(cells, "high"), "high", 1, issues);
@@ -194,18 +197,21 @@ export function checkSkuSheet(table: SheetTable): ImportCheck {
       1,
       issues,
     );
-    const warehouseOnHand = readWholeNumber(
-      get(cells, "warehouseOnHand"),
-      "warehouseOnHand",
-      0,
-      issues,
-    );
+    const onHandCell = get(cells, "warehouseOnHand");
+    const warehouseOnHand = isBlank(onHandCell)
+      ? null
+      : readWholeNumber(onHandCell, "warehouseOnHand", 0, issues);
 
     let asin = optionalText(get(cells, "asin"));
     if (asin !== null) {
       asin = asin.toUpperCase();
       if (!/^[A-Z0-9]{10}$/.test(asin)) {
-        issues.push(`ASIN must be 10 letters and numbers, such as B0ABC12345, but it says "${asin}".`);
+        // A typo in an optional column should not block the import: warn and leave it blank.
+        warnings.push({
+          row: rowNumber,
+          message: `ASIN should be 10 letters and numbers, such as B0ABC12345, but it says "${asin}" (${asin.length} characters). It will be left blank. Fix it in the sheet or on the SKU's edit screen.`,
+        });
+        asin = null;
       }
     }
 
@@ -230,7 +236,7 @@ export function checkSkuSheet(table: SheetTable): ImportCheck {
       tie: tie!,
       high: high!,
       maxCasesPerPallet: maxCasesPerPallet!,
-      warehouseOnHand: warehouseOnHand!,
+      warehouseOnHand,
       description: optionalText(get(cells, "description")),
       warehouseLocation: optionalText(get(cells, "warehouseLocation")),
       asin,

@@ -77,6 +77,23 @@ export function SkuForm({
         {field("asin", "ASIN", { hint: "Optional. 10 letters and numbers." })}
       </div>
       <div className="field">
+        <label htmlFor="countUnits">New warehouse count (units)</label>
+        <input
+          id="countUnits"
+          name="countUnits"
+          type="number"
+          min={0}
+          step={1}
+          inputMode="numeric"
+          aria-invalid={err("countUnits") ? true : undefined}
+        />
+        {err("countUnits") ? (
+          <span className="hint" style={{ color: "var(--danger)" }}>{err("countUnits")}</span>
+        ) : (
+          <span className="hint">Optional. Type the units you counted today. Leave blank to keep the last count.</span>
+        )}
+      </div>
+      <div className="field">
         <label htmlFor="notes">Notes</label>
         <textarea id="notes" name="notes" rows={3} defaultValue={defaults.notes} />
       </div>

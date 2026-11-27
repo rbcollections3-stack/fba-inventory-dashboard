@@ -35,8 +35,8 @@ export function ImportForm() {
   if (state.stage === "done") {
     return (
       <div className="alert ok" role="status">
-        Import finished: {state.created} new SKUs added and {state.updated} updated. Warehouse on-hand counts were
-        recorded for every row. <Link href="/skus">See all SKUs</Link>
+        Import finished: {state.created} new SKUs added and {state.updated} updated. Warehouse counts were recorded
+        for every row that had one. <Link href="/skus">See all SKUs</Link>
       </div>
     );
   }
@@ -101,7 +101,9 @@ export function ImportForm() {
                     <td className="num">{r.tie}</td>
                     <td className="num">{r.high}</td>
                     <td className="num">{r.maxCasesPerPallet}</td>
-                    <td className="num">{r.warehouseOnHand.toLocaleString("en-US")}</td>
+                    <td className="num">
+                      {r.warehouseOnHand === null ? <span className="muted">not counted</span> : r.warehouseOnHand.toLocaleString("en-US")}
+                    </td>
                     <td className="muted small">
                       {state.existing.includes(r.amazonSku.toLowerCase()) ? "update" : "new"}
                     </td>
