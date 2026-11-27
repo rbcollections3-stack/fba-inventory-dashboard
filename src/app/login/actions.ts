@@ -11,7 +11,7 @@ import {
   startSession,
 } from "@/lib/auth/session";
 import { signSetupProof, verifySetupProof } from "@/lib/auth/token";
-import { changeOwnPassword, checkLogin, checkLoginCode, confirmTotpSetup, MIN_PASSWORD_LENGTH } from "@/lib/auth/users";
+import { bootstrapProblems, changeOwnPassword, checkLogin, checkLoginCode, confirmTotpSetup } from "@/lib/auth/users";
 
 export type FormState = { error?: string };
 
@@ -41,7 +41,7 @@ export async function login(_prev: FormState, formData: FormData): Promise<FormS
     if (result.reason === "disabled") return { error: "This login has been turned off. Ask the admin." };
     if (result.reason === "setup-needed") {
       return {
-        error: `The app is not set up yet. ADMIN_PASSWORD and STAFF_PASSWORD must be set, each at least ${MIN_PASSWORD_LENGTH} characters with a special character. See SETUP.md.`,
+        error: `The app is not set up yet. In Vercel's Environment Variables: ${bootstrapProblems().join(" ")} Then redeploy. See SETUP.md.`,
       };
     }
     return { error: "That username and password do not match." };

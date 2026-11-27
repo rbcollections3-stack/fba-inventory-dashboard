@@ -111,3 +111,20 @@ describe("database connections", () => {
     expect(needsTls("postgres://u:p@aws-0-us-east-1.pooler.supabase.com:6543/postgres")).toBe(true);
   });
 });
+
+describe("first-login settings", () => {
+  it("say which setting is wrong without showing it", async () => {
+    const { bootstrapProblems } = await import("@/lib/auth/users");
+    expect(bootstrapProblems({ ADMIN_PASSWORD: "Dashboard-key-01!", STAFF_PASSWORD: "Shelf-pallet-02!" })).toEqual([]);
+    expect(bootstrapProblems({})).toEqual([
+      "ADMIN_PASSWORD is not set (or not ticked for this environment).",
+      "STAFF_PASSWORD is not set (or not ticked for this environment).",
+    ]);
+    const problems = bootstrapProblems({ ADMIN_PASSWORD: "my-admin-pass-1!", STAFF_PASSWORD: "shortpass" });
+    expect(problems).toEqual([
+      'ADMIN_PASSWORD: it cannot contain the username "admin".',
+      "STAFF_PASSWORD: Passwords must be at least 12 characters.",
+    ]);
+    expect(problems.join(" ")).not.toContain("my-admin-pass");
+  });
+});

@@ -59,6 +59,29 @@ export type BootstrapEnv = Record<string, string | undefined>;
 export type BootstrapStatus = "ready" | "created" | "missing-env";
 
 /**
+ * What is wrong with the first-login settings, in plain words, without
+ * revealing the values. Shown only while no logins exist yet.
+ */
+export function bootstrapProblems(env: BootstrapEnv = process.env): string[] {
+  const adminName = normalizeUsername(env.ADMIN_USERNAME || "admin");
+  const staffName = normalizeUsername(env.STAFF_USERNAME || "warehouse");
+  const problems: string[] = [];
+  const check = (key: string, username: string) => {
+    const value = env[key];
+    if (!value) {
+      problems.push(`${key} is not set (or not ticked for this environment).`);
+      return;
+    }
+    const p = passwordProblem(value, username);
+    if (p) problems.push(`${key}: ${p.replace("Passwords cannot contain the username.", `it cannot contain the username "${username}".`)}`);
+  };
+  check("ADMIN_PASSWORD", adminName);
+  check("STAFF_PASSWORD", staffName);
+  if (adminName === staffName) problems.push("ADMIN_USERNAME and STAFF_USERNAME must be different.");
+  return problems;
+}
+
+/**
  * Creates the first admin and first warehouse staff login the first time the
  * app runs, from the ADMIN_PASSWORD and STAFF_PASSWORD settings. Both must
  * choose a new password and set up an authenticator app at their first login.
