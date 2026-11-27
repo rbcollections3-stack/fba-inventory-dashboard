@@ -20,8 +20,14 @@ Authenticator or Microsoft Authenticator (both free). Every login asks for a
    GitHub is easiest).
 2. Click **New project**. Name it `fba-dashboard`, pick the region closest to
    you, and click **Generate a password** for the database password. Copy that
-   password into your password manager. Click **Create new project** and wait
-   a minute or two.
+   password into your password manager.
+   Under **Data access** (sometimes under "Security" or "Advanced"), **untick**
+   "Enable Data API", "Grant API access to new tables automatically" and
+   "Enable RLS on new tables automatically". The dashboard connects to the
+   database directly and never uses the Data API, so leaving it on would only
+   open an extra way in. Click **Create new project** and wait a minute or two.
+   (If the project already exists, turn it off under
+   **Project Settings > Data API**.)
 3. Click **Connect** at the top of the project page. Find the
    **Transaction pooler** connection string (it ends in `:6543/postgres`).
    Copy it and replace `[YOUR-PASSWORD]` with the database password from step 2.
