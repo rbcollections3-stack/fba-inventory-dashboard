@@ -52,9 +52,15 @@ Authenticator or Microsoft Authenticator (both free). Every login asks for a
    | `STAFF_PASSWORD` | a first password for the first warehouse login, following the same rules and not containing "warehouse". They replace it at their first login. |
    | `ADMIN_USERNAME` | optional. Leave out to use `admin` |
    | `STAFF_USERNAME` | optional. Leave out to use `warehouse`. Using the employee's first name is better, because each login belongs to one person. |
+   Tick **Production** and **Preview** for each one. Preview is the test
+   copy of the site that Vercel builds for each pull request, so you can try
+   changes before approving them.
 4. Click **Deploy**. Vercel creates the database tables and builds the site.
    When it finishes it shows the web address, something like
-   `fba-inventory-dashboard.vercel.app`. It is HTTPS only.
+   `fba-inventory-dashboard.vercel.app`. It is HTTPS only. (If you deploy
+   before the first pull request is approved, this first build fails because
+   the main branch has no app yet. That is expected: use the pull request's
+   preview link until it is merged.)
 
 ## 3. First login
 
