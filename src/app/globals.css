@@ -160,3 +160,18 @@ input[type="text"], input[type="password"], input[type="number"], input[type="fi
   .topbar, .no-print { display: none; }
   body { background: #fff; }
 }
+
+pre.codes {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 12px;
+  font-size: 1.05rem;
+  line-height: 1.6;
+  margin: 0;
+}
+code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+.badge { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 0.8rem; }
+.badge.ok { background: var(--ok-bg); color: var(--ok); }
+.badge.warn { background: var(--warn-bg); color: var(--warn); }
+.badge.off { background: var(--danger-bg); color: var(--danger); }

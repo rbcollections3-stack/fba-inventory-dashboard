@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { homeFor } from "@/lib/auth/access";
 import { getCurrentUser } from "@/lib/auth/session";
-import { LoginForm } from "./login-form";
+import { LoginForm } from "./forms";
 
 export const metadata = { title: "Log in · RB Collections FBA Dashboard" };
 

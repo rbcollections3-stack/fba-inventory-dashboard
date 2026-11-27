@@ -23,8 +23,8 @@ export default defineConfig({
     env: {
       DATABASE_URL,
       AUTH_SECRET: "e2e-secret-e2e-secret-e2e-secret-0123",
-      ADMIN_PASSWORD: "admin-password-1",
-      STAFF_PASSWORD: "staff-password-1",
+      ADMIN_PASSWORD: "Dashboard-key-01!",
+      STAFF_PASSWORD: "Shelf-pallet-02!",
     },
   },
 });

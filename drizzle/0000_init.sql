@@ -7,6 +7,14 @@ CREATE TABLE "listings" (
 	CONSTRAINT "listings_name_unique" UNIQUE("name")
 );
 --> statement-breakpoint
+CREATE TABLE "recovery_codes" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"user_id" integer NOT NULL,
+	"code_hash" text NOT NULL,
+	"used_at" timestamp with time zone,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
 CREATE TABLE "skus" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"listing_id" integer NOT NULL,
@@ -38,6 +46,12 @@ CREATE TABLE "users" (
 	"session_version" integer DEFAULT 1 NOT NULL,
 	"failed_logins" integer DEFAULT 0 NOT NULL,
 	"locked_until" timestamp with time zone,
+	"password_changed_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"must_change_password" boolean DEFAULT true NOT NULL,
+	"totp_secret_enc" text,
+	"totp_enabled_at" timestamp with time zone,
+	"totp_last_step" integer,
+	"disabled_at" timestamp with time zone,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "users_username_unique" UNIQUE("username")
@@ -54,8 +68,10 @@ CREATE TABLE "warehouse_counts" (
 	CONSTRAINT "warehouse_counts_units_nonnegative" CHECK ("warehouse_counts"."units" >= 0)
 );
 --> statement-breakpoint
+ALTER TABLE "recovery_codes" ADD CONSTRAINT "recovery_codes_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "skus" ADD CONSTRAINT "skus_listing_id_listings_id_fk" FOREIGN KEY ("listing_id") REFERENCES "public"."listings"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "warehouse_counts" ADD CONSTRAINT "warehouse_counts_sku_id_skus_id_fk" FOREIGN KEY ("sku_id") REFERENCES "public"."skus"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "warehouse_counts" ADD CONSTRAINT "warehouse_counts_created_by_users_id_fk" FOREIGN KEY ("created_by") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+CREATE INDEX "recovery_codes_user_idx" ON "recovery_codes" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "skus_listing_idx" ON "skus" USING btree ("listing_id");--> statement-breakpoint
 CREATE INDEX "warehouse_counts_sku_idx" ON "warehouse_counts" USING btree ("sku_id","created_at");

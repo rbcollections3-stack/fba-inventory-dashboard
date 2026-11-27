@@ -8,8 +8,20 @@ build plan for the full picture.
 SKU spreadsheet.
 
 - **Admin login** sees everything: SKU setup, spreadsheet import, the
-  warehouse screen and the Accounts screen for changing passwords.
-- **Warehouse staff login** sees only the Warehouse screen.
+  warehouse screen and the Accounts screen.
+- **Warehouse staff logins**, one per person, see only the Warehouse screen.
+
+Login security:
+
+- Passwords: at least 12 characters with a special character, not containing
+  the username, expiring every 365 days. First logins and admin-set temporary
+  passwords must be replaced.
+- Every login needs a 6 digit code from an authenticator app (TOTP), with 8
+  one-time backup codes. Secrets are stored encrypted; codes work once.
+- 5 wrong passwords or codes lock a login for 15 minutes.
+- Admin can add staff logins, set temporary passwords, reset an
+  authenticator, and turn a login off. Any of these signs that person out.
+- HTTPS only (HSTS header); remote database connections must use TLS.
 
 To put the app online, follow **[SETUP.md](SETUP.md)**.
 
@@ -30,7 +42,8 @@ ASIN, Count date, Notes.
 ## For developers
 
 Stack: Next.js 16 (App Router, TypeScript), Postgres with Drizzle ORM,
-cookie sessions signed with `jose`, passwords hashed with bcrypt.
+cookie sessions signed with `jose`, passwords hashed with bcrypt, TOTP
+(RFC 6238) implemented in `src/lib/auth/totp.ts`.
 
 ```bash
 cp .env.example .env.local      # then fill in the values
@@ -50,7 +63,7 @@ npm run dev                     # http://localhost:3000
 Layout:
 
 - `src/db/` database schema and connection; migrations in `drizzle/`
-- `src/lib/auth/` logins, sessions and who can see which screen
+- `src/lib/auth/` logins, authenticator codes, sessions and who can see which screen
 - `src/lib/skus/` spreadsheet reading, row checks and saving
 - `src/app/` screens; `src/proxy.ts` sends logged-out visitors to the login page
 - `tests/unit`, `tests/integration` (needs Postgres), `tests/e2e` (Playwright)

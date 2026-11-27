@@ -21,5 +21,5 @@ export async function freshDb(): Promise<{ db: Db; close: () => Promise<void> }>
 }
 
 export async function clearData(db: Db): Promise<void> {
-  await db.execute(sql`truncate warehouse_counts, skus, listings, users restart identity cascade`);
+  await db.execute(sql`truncate warehouse_counts, skus, listings, recovery_codes, users restart identity cascade`);
 }

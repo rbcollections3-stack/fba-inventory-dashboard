@@ -1,4 +1,5 @@
 import {
+  boolean,
   check,
   date,
   index,
@@ -13,7 +14,7 @@ import { sql } from "drizzle-orm";
 
 export const roleEnum = pgEnum("user_role", ["admin", "staff"]);
 
-/** The two logins: one admin, one warehouse staff. */
+/** Logins: one admin, plus one per warehouse employee (no shared logins). */
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   username: text("username").notNull().unique(),
@@ -23,9 +24,34 @@ export const users = pgTable("users", {
   sessionVersion: integer("session_version").notNull().default(1),
   failedLogins: integer("failed_logins").notNull().default(0),
   lockedUntil: timestamp("locked_until", { withTimezone: true }),
+  /** Passwords expire PASSWORD_MAX_AGE_DAYS after this. */
+  passwordChangedAt: timestamp("password_changed_at", { withTimezone: true }).notNull().defaultNow(),
+  /** Set for first logins and after an admin sets someone's password. */
+  mustChangePassword: boolean("must_change_password").notNull().default(true),
+  /** Authenticator app secret, encrypted with a key derived from AUTH_SECRET. */
+  totpSecretEnc: text("totp_secret_enc"),
+  totpEnabledAt: timestamp("totp_enabled_at", { withTimezone: true }),
+  /** Last 30-second step a code was accepted for, so a code cannot be reused. */
+  totpLastStep: integer("totp_last_step"),
+  disabledAt: timestamp("disabled_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+/** One-time backup codes for when someone loses their phone. Stored hashed. */
+export const recoveryCodes = pgTable(
+  "recovery_codes",
+  {
+    id: serial("id").primaryKey(),
+    userId: integer("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    codeHash: text("code_hash").notNull(),
+    usedAt: timestamp("used_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("recovery_codes_user_idx").on(t.userId)],
+);
 
 /** An Amazon listing (parent). Each listing has one or more SKUs. */
 export const listings = pgTable("listings", {
