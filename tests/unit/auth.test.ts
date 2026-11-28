@@ -9,7 +9,7 @@ const SECRET = "test-secret-test-secret-test-secret-123";
 
 describe("who can open which screen", () => {
   it("lets the admin open everything", () => {
-    for (const p of ["/skus", "/skus/import", "/skus/3", "/accounts", "/warehouse"]) {
+    for (const p of ["/overview", "/overview/3", "/skus", "/skus/import", "/skus/3", "/accounts", "/warehouse"]) {
       expect(canAccess("admin", p)).toBe(true);
     }
   });
@@ -17,13 +17,13 @@ describe("who can open which screen", () => {
   it("keeps warehouse staff on warehouse screens only", () => {
     expect(canAccess("staff", "/warehouse")).toBe(true);
     expect(canAccess("staff", "/warehouse/pallets/1")).toBe(true);
-    for (const p of ["/skus", "/skus/import", "/accounts", "/warehouse-admin", "/"]) {
+    for (const p of ["/overview", "/overview/3", "/skus", "/skus/import", "/accounts", "/warehouse-admin", "/"]) {
       expect(canAccess("staff", p)).toBe(false);
     }
   });
 
   it("sends each login to its own home screen", () => {
-    expect(homeFor("admin")).toBe("/skus");
+    expect(homeFor("admin")).toBe("/overview");
     expect(homeFor("staff")).toBe("/warehouse");
   });
 

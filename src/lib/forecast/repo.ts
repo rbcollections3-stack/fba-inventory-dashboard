@@ -1,0 +1,105 @@
+import { eq, sql } from "drizzle-orm";
+import type { Db } from "@/db";
+import { amazonImports, fbaLedgerDaily, forecastSettings } from "@/db/schema";
+import { latestFbaStock, recentSales, type FbaFigures } from "@/lib/amazon/repo";
+import { businessTimeZone } from "@/lib/dates";
+import { listSkus, type SkuWithStock } from "@/lib/skus/repo";
+import { compareUrgency, daysBetween, forecastSku, RULES, type Forecast } from "./rules";
+
+export type SkuForecast = SkuWithStock & {
+  fba: FbaFigures | null;
+  unitsSold: number | null;
+  manualDailySales: number | null;
+  manualNote: string | null;
+  forecast: Forecast;
+};
+
+export type ForecastBoard = {
+  rows: SkuForecast[];
+  /** The sales window the rates come from, or null if no sales are loaded. */
+  sales: { start: string; end: string; days: number } | null;
+  /** When the newest FBA stock figures were true. */
+  stockAsOf: Date | null;
+  today: string;
+};
+
+/** The calendar day (YYYY-MM-DD) a moment falls on in the business's time zone. */
+export function dayInBusinessZone(d: Date): string {
+  return d.toLocaleDateString("en-CA", { timeZone: businessTimeZone() });
+}
+
+/** First day of ledger data the app holds, so a short history gives a lower day count. */
+async function firstLedgerDay(db: Db): Promise<string | null> {
+  const [a] = await db.select({ d: sql<string | null>`min(${fbaLedgerDaily.day})::text` }).from(fbaLedgerDaily);
+  const [b] = await db
+    .select({ d: sql<string | null>`min(${amazonImports.periodStart})::text` })
+    .from(amazonImports)
+    .where(eq(amazonImports.kind, "ledger_detail"));
+  return [a?.d, b?.d].filter((d): d is string => !!d).sort()[0] ?? null;
+}
+
+export async function getForecastSettings(db: Db) {
+  const rows = await db.select().from(forecastSettings);
+  return new Map(rows.map((r) => [r.skuId, r]));
+}
+
+export async function setManualDailySales(
+  db: Db,
+  skuId: number,
+  value: number | null,
+  note: string | null,
+  userId: number | null,
+): Promise<void> {
+  await db
+    .insert(forecastSettings)
+    .values({ skuId, manualDailySales: value, note, updatedBy: userId })
+    .onConflictDoUpdate({
+      target: forecastSettings.skuId,
+      set: { manualDailySales: value, note, updatedBy: userId, updatedAt: new Date() },
+    });
+}
+
+/** Every SKU with its forecast, most urgent first. */
+export async function loadForecastBoard(db: Db, today: string): Promise<ForecastBoard> {
+  const [base, fba, sales, settings, firstDay] = await Promise.all([
+    listSkus(db),
+    latestFbaStock(db),
+    recentSales(db, RULES.salesWindowDays),
+    getForecastSettings(db),
+    firstLedgerDay(db),
+  ]);
+
+  let salesDays = 0;
+  if (sales) {
+    const start = firstDay && firstDay > sales.start ? firstDay : sales.start;
+    salesDays = daysBetween(start, sales.end) + 1;
+  }
+
+  const rows: SkuForecast[] = base.map((s) => {
+    const f = fba.get(s.id) ?? null;
+    const setting = settings.get(s.id);
+    const unitsSold = sales ? (sales.bySku.get(s.id) ?? 0) : null;
+    const manualDailySales = setting?.manualDailySales ?? null;
+    const forecast = forecastSku({
+      unitsPerCase: s.unitsPerCase,
+      unitsSold,
+      salesDays,
+      manualDailySales,
+      fba: f ? { available: f.fulfillable, inbound: f.inbound } : null,
+      stockDay: f ? dayInBusinessZone(f.asOf) : null,
+      warehouse: s.warehouseOnHand,
+      onOrder: 0,
+      today,
+    });
+    return { ...s, fba: f, unitsSold, manualDailySales, manualNote: setting?.note ?? null, forecast };
+  });
+  rows.sort((a, b) => compareUrgency(a.forecast, b.forecast) || a.amazonSku.localeCompare(b.amazonSku));
+
+  const stockAsOf = [...fba.values()].map((v) => v.asOf).sort((a, b) => b.getTime() - a.getTime())[0] ?? null;
+  return {
+    rows,
+    sales: sales ? { start: sales.start, end: sales.end, days: salesDays } : null,
+    stockAsOf,
+    today,
+  };
+}

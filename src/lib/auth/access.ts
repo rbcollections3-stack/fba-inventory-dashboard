@@ -28,5 +28,5 @@ export function canAccess(role: Role, pathname: string): boolean {
 
 /** Where each login lands after signing in. */
 export function homeFor(role: Role): string {
-  return role === "admin" ? "/skus" : "/warehouse";
+  return role === "admin" ? "/overview" : "/warehouse";
 }
