@@ -25,6 +25,7 @@ export default defineConfig({
       AUTH_SECRET: "e2e-secret-e2e-secret-e2e-secret-0123",
       ADMIN_PASSWORD: "Dashboard-key-01!",
       STAFF_PASSWORD: "Shelf-pallet-02!",
+      CRON_SECRET: "e2e-cron-secret-0123456789abcdef",
     },
   },
 });

@@ -1,7 +1,13 @@
 import { getDb } from "@/db";
 import { requireAdmin } from "@/lib/auth/session";
 import { listAmazonImports } from "@/lib/amazon/repo";
+import { missingSpApiSettings } from "@/lib/amazon/sp-api";
+import { amazonSyncStatus, type KindStatus } from "@/lib/amazon/sync";
+import { RefreshButton } from "./refresh-button";
 import { UploadForm } from "./upload-form";
+
+// The Refresh button waits for Amazon, which can take a few minutes.
+export const maxDuration = 300;
 
 export const metadata = { title: "Amazon reports · RB Collections FBA Dashboard" };
 
@@ -11,21 +17,80 @@ function when(d: Date): string {
   return d.toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", timeZone: "America/Los_Angeles", timeZoneName: "short" });
 }
 
+const SYNC_NAME = { fba_inventory: "FBA stock and inbound", ledger_detail: "Daily sales" } as const;
+
+function SyncRow({ s }: { s: KindStatus }) {
+  const l = s.latest;
+  let state: React.ReactNode = <span className="badge off">Never pulled</span>;
+  if (l?.status === "requested") state = <span className="badge warn">Waiting for Amazon</span>;
+  else if (l?.status === "saved") state = <span className="badge ok">OK</span>;
+  else if (l?.status === "no_data") state = <span className="badge warn">Amazon had no data</span>;
+  else if (l?.status === "failed") state = <span className="badge off">Failed</span>;
+  return (
+    <tr data-testid={`sync-${s.kind}`}>
+      <td>{SYNC_NAME[s.kind]}</td>
+      <td>{state}</td>
+      <td>{s.lastSaved?.finishedAt ? when(s.lastSaved.finishedAt) : "-"}</td>
+      <td className="wrap">{l?.status === "failed" ? l.message : ""}</td>
+    </tr>
+  );
+}
+
 export default async function AmazonReportsPage() {
   await requireAdmin();
-  const imports = await listAmazonImports(getDb());
+  const db = getDb();
+  const [imports, sync] = await Promise.all([listAmazonImports(db), amazonSyncStatus(db)]);
+  const missing = missingSpApiSettings();
+  const connected = missing.length === 0;
   return (
     <>
       <div className="page-head">
         <div>
           <h1>Amazon reports</h1>
           <p className="muted">
-            Upload Seller Central reports here to update FBA stock, units inbound to Amazon and daily sales. Once the
-            Amazon connection is set up, these update automatically every day and uploading becomes optional.
+            FBA stock, units inbound to Amazon and daily sales come from Amazon automatically every morning. Uploading
+            reports by hand still works as a backup.
           </p>
         </div>
       </div>
 
+      <div className="card" data-testid="amazon-connection">
+        <h2 style={{ marginTop: 0 }}>
+          Automatic Amazon connection{" "}
+          {connected ? <span className="badge ok">Keys set up</span> : <span className="badge off">Not set up</span>}
+        </h2>
+        {connected ? (
+          <p className="muted">
+            Every morning the app asks Amazon for your FBA stock, units inbound to Amazon and the last 31 days of
+            sales, and loads them by itself. It only reads reports; it never changes anything in Seller Central.
+          </p>
+        ) : (
+          <p className="muted">
+            The Amazon keys are not in Vercel yet (missing: {missing.join(", ")}). Until they are, upload reports
+            below. See &quot;Connect Amazon&quot; in SETUP.md for the steps.
+          </p>
+        )}
+        <div className="table-wrap" style={{ marginBottom: 12 }}>
+          <table>
+            <thead>
+              <tr>
+                <th>Report</th>
+                <th>Status</th>
+                <th>Last loaded</th>
+                <th>Problem</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sync.map((s) => (
+                <SyncRow key={s.kind} s={s} />
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <RefreshButton disabled={!connected} />
+      </div>
+
+      <h2>Upload reports by hand (backup)</h2>
       <div className="card">
         <h2 style={{ marginTop: 0 }}>Which reports to download</h2>
         <ol className="steps">

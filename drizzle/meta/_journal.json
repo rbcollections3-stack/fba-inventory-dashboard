@@ -15,6 +15,13 @@
       "when": 1795824700040,
       "tag": "0001_phase2_amazon_data",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1795825593165,
+      "tag": "0002_phase3_amazon_sync",
+      "breakpoints": true
     }
   ]
 }
