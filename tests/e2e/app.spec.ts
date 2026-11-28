@@ -1,5 +1,6 @@
 import { expect, test, type Browser, type Page } from "@playwright/test";
 import path from "node:path";
+import { ROOT } from "../helpers";
 import { E2E_DIR } from "./global-setup";
 import { backupCodes, enterPassword, fullLogin, nextCode } from "./login-helpers";
 
@@ -130,12 +131,28 @@ test("warehouse staff only see the warehouse screen", async ({ browser }) => {
   await fullLogin(page, "warehouse", STAFF_FIRST, STAFF_PW);
   await expect(page).toHaveURL(/\/warehouse$/);
   await expect(page.getByTestId("wh-card")).toHaveCount(21);
-  await expect(page.getByRole("navigation", { name: "Main" }).getByRole("link")).toHaveText(["Warehouse"]);
+  await expect(page.getByRole("navigation", { name: "Main" }).getByRole("link")).toHaveText(["Warehouse", "Stock counts"]);
 
-  for (const p of ["/skus", "/skus/import", "/skus/1", "/accounts", "/"]) {
+  for (const p of ["/skus", "/skus/import", "/skus/1", "/accounts", "/amazon", "/"]) {
     await page.goto(p);
     await expect(page).toHaveURL(/\/warehouse$/);
   }
+
+  // Staff enter a stock count: 10 full cases of X001 (12 per case) plus 3 loose.
+  await page.getByRole("link", { name: "Enter stock counts" }).click();
+  await expect(page).toHaveURL(/\/warehouse\/counts$/);
+  await expect(page.getByTestId("count-row")).toHaveCount(21);
+  await page.getByLabel("Full cases of X001").fill("10");
+  await page.getByLabel("Loose units of X001").fill("3");
+  const x001 = page.getByTestId("count-row").filter({ hasText: "X001" });
+  await expect(x001.getByTestId("count-total")).toHaveText("123");
+  await page.getByLabel("Full cases of X002").fill("abc");
+  await page.getByRole("button", { name: "Save counts" }).click();
+  await expect(page.locator(".alert.error")).toContainText("Nothing was saved");
+  await page.getByLabel("Full cases of X002").fill("");
+  await page.getByRole("button", { name: "Save counts" }).click();
+  await expect(page.getByText("Saved 1 count.")).toBeVisible();
+  await expect(x001).toContainText("123");
 });
 
 test("admin adds an individual staff login, who sets up their own password and app", async ({ browser }) => {
@@ -223,4 +240,45 @@ test("the site sends security headers", async ({ request }) => {
   expect(res.headers()["strict-transport-security"]).toContain("max-age=");
   expect(res.headers()["x-frame-options"]).toBe("DENY");
   expect(res.headers()["x-powered-by"]).toBeUndefined();
+});
+
+const fixture = (name: string) => path.join(ROOT, "tests/fixtures", name);
+
+// Phase 2: Amazon reports. The fixtures are made-up files in Seller Central's layouts.
+test("admin uploads both Amazon reports and sees FBA stock, inbound and sales per SKU", async () => {
+  const page = admin;
+  await page.goto("/skus");
+  await expect(page.getByTestId("amazon-freshness")).toContainText("No FBA stock loaded yet");
+
+  await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Amazon reports" }).click();
+  await expect(page).toHaveURL(/\/amazon$/);
+  await page.getByLabel("Amazon report files").setInputFiles([
+    fixture("fba-inventory-sample.txt"),
+    fixture("ledger-detail-sample.tsv"),
+  ]);
+  await page.getByRole("button", { name: "Upload" }).click();
+  await expect(page.getByTestId("upload-ok")).toHaveCount(2);
+  await expect(page.getByTestId("upload-ok").first()).toContainText("Manage FBA Inventory");
+  await expect(page.getByTestId("upload-ok").first()).toContainText("Skipped 2 rows");
+  await expect(page.getByTestId("upload-ok").nth(1)).toContainText("Oct 1, 2026 to Oct 31, 2026");
+  await expect(page.getByTestId("import-row")).toHaveCount(2);
+
+  await page.goto("/skus");
+  const blk = page.getByTestId("sku-row").filter({ hasText: "EX-TOTE-BLK" });
+  await expect(blk.getByTestId("fba-cell")).toHaveText("240");
+  await expect(blk.getByTestId("inbound-cell")).toHaveText("120");
+  await expect(blk.getByTestId("sold-cell")).toHaveText("4");
+  await expect(page.getByTestId("fba-total")).toHaveText("310");
+  await expect(page.getByTestId("inbound-total")).toHaveText("120");
+  await expect(page.getByTestId("amazon-freshness")).toContainText("Oct 2, 2026 to Oct 31, 2026");
+
+  // A file that is not one of the two reports is refused with a plain reason.
+  await page.goto("/amazon");
+  await page.getByLabel("Amazon report files").setInputFiles({
+    name: "business-report.csv",
+    mimeType: "text/csv",
+    buffer: Buffer.from("Date,Units Ordered\n10/01/2026,5\n"),
+  });
+  await page.getByRole("button", { name: "Upload" }).click();
+  await expect(page.locator(".alert.error")).toContainText("not one of the Amazon reports");
 });

@@ -9,6 +9,7 @@ import {
   serial,
   text,
   timestamp,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
@@ -115,6 +116,93 @@ export const warehouseCounts = pgTable(
     index("warehouse_counts_sku_idx").on(t.skuId, t.createdAt),
     check("warehouse_counts_units_nonnegative", sql`${t.units} >= 0`),
   ],
+);
+
+export const amazonReportKindEnum = pgEnum("amazon_report_kind", ["ledger_detail", "fba_inventory"]);
+export const amazonReportSourceEnum = pgEnum("amazon_report_source", ["upload", "sp_api"]);
+
+/**
+ * One row per Amazon report loaded into the app, whether uploaded by hand or
+ * (from Phase 3) pulled automatically through the Selling Partner API.
+ */
+export const amazonImports = pgTable(
+  "amazon_imports",
+  {
+    id: serial("id").primaryKey(),
+    kind: amazonReportKindEnum("kind").notNull(),
+    source: amazonReportSourceEnum("source").notNull(),
+    fileName: text("file_name"),
+    /** For the inventory report: when Amazon's numbers were true. */
+    asOf: timestamp("as_of", { withTimezone: true }),
+    /** For the ledger: first and last day covered. */
+    periodStart: date("period_start", { mode: "string" }),
+    periodEnd: date("period_end", { mode: "string" }),
+    rowsRead: integer("rows_read").notNull(),
+    rowsUsed: integer("rows_used").notNull(),
+    skusMatched: integer("skus_matched").notNull(),
+    /** Rows for SKUs that are not in the SKU list (other SKUs, amzn.gr.* resale SKUs). */
+    rowsSkipped: integer("rows_skipped").notNull(),
+    createdBy: integer("created_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("amazon_imports_kind_idx").on(t.kind, t.createdAt)],
+);
+
+/**
+ * FBA Inventory Ledger events summed per SKU, day, event type and disposition
+ * (all fulfillment centers added together). "Shipments" rows are units shipped
+ * to customers, which is the daily sales figure.
+ */
+export const fbaLedgerDaily = pgTable(
+  "fba_ledger_daily",
+  {
+    id: serial("id").primaryKey(),
+    skuId: integer("sku_id")
+      .notNull()
+      .references(() => skus.id, { onDelete: "cascade" }),
+    day: date("day", { mode: "string" }).notNull(),
+    eventType: text("event_type").notNull(),
+    disposition: text("disposition").notNull(),
+    quantity: integer("quantity").notNull(),
+    importId: integer("import_id")
+      .notNull()
+      .references(() => amazonImports.id, { onDelete: "cascade" }),
+  },
+  (t) => [
+    uniqueIndex("fba_ledger_daily_key").on(t.skuId, t.day, t.eventType, t.disposition),
+    index("fba_ledger_daily_day_idx").on(t.day),
+  ],
+);
+
+/**
+ * FBA stock per SKU at a point in time. The latest row per SKU is what the
+ * app shows; older rows are kept as history (for out-of-stock days later).
+ */
+export const fbaInventorySnapshots = pgTable(
+  "fba_inventory_snapshots",
+  {
+    id: serial("id").primaryKey(),
+    skuId: integer("sku_id")
+      .notNull()
+      .references(() => skus.id, { onDelete: "cascade" }),
+    importId: integer("import_id")
+      .notNull()
+      .references(() => amazonImports.id, { onDelete: "cascade" }),
+    asOf: timestamp("as_of", { withTimezone: true }).notNull(),
+    /** Available to sell (Amazon: fulfillable). */
+    fulfillable: integer("fulfillable").notNull(),
+    /** Held by Amazon for open orders, transfers between centers and processing. */
+    reserved: integer("reserved").notNull(),
+    unsellable: integer("unsellable").notNull(),
+    /** Shipment created in Seller Central but not yet sent. */
+    inboundWorking: integer("inbound_working").notNull(),
+    /** Sent and on the way to Amazon. */
+    inboundShipped: integer("inbound_shipped").notNull(),
+    /** Arrived at Amazon and being checked in. */
+    inboundReceiving: integer("inbound_receiving").notNull(),
+    researching: integer("researching").notNull(),
+  },
+  (t) => [index("fba_inventory_snapshots_sku_idx").on(t.skuId, t.asOf)],
 );
 
 export type User = typeof users.$inferSelect;

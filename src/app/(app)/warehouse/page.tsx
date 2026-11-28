@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { getDb } from "@/db";
 import { requireUser } from "@/lib/auth/session";
 import { groupByListing, listSkus } from "@/lib/skus/repo";
@@ -13,10 +14,13 @@ export default async function WarehousePage() {
         <div>
           <h1>Warehouse</h1>
           <p className="muted">
-            How each product is packed and stacked. Pallet build sheets for requested shipments and stock count
-            entry will appear on this screen in later updates.
+            How each product is packed and stacked. Pallet build sheets for requested shipments will appear on
+            this screen in a later update.
           </p>
         </div>
+        <Link className="button primary" href="/warehouse/counts">
+          Enter stock counts
+        </Link>
       </div>
       {groups.length === 0 && <div className="card">No SKUs have been set up yet.</div>}
       {groups.map((g) => (
