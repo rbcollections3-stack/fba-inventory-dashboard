@@ -12,6 +12,8 @@ import {
   LayoutDashboard,
   Menu,
   Package,
+  PackageOpen,
+  Ship,
   Truck,
   Users,
   Warehouse,
@@ -29,6 +31,7 @@ const SECTIONS: Section[] = [
     items: [
       { href: "/overview", label: "Overview", icon: LayoutDashboard, adminOnly: true },
       { href: "/shipments", label: "Ship to Amazon", icon: Truck, adminOnly: true },
+      { href: "/china", label: "China orders", icon: Ship, adminOnly: true },
     ],
   },
   {
@@ -45,6 +48,7 @@ const SECTIONS: Section[] = [
       { href: "/warehouse", label: "Warehouse", icon: Warehouse },
       { href: "/warehouse/shipments", label: "Pallet sheets", icon: Layers },
       { href: "/warehouse/labels", label: "Barcode labels", icon: Barcode },
+      { href: "/warehouse/receiving", label: "Receiving", icon: PackageOpen },
       { href: "/warehouse/counts", label: "Stock counts", icon: ClipboardCheck },
     ],
   },
