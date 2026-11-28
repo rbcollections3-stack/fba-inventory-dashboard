@@ -1,8 +1,11 @@
 import Link from "next/link";
 import { getDb } from "@/db";
 import { requireUser } from "@/lib/auth/session";
+import { listOpenChinaOrders } from "@/lib/china/repo";
+import { businessToday } from "@/lib/dates";
 import { listShipments } from "@/lib/shipments/repo";
 import { groupByListing, listSkus } from "@/lib/skus/repo";
+import { ChinaOrderList } from "../china/order-list";
 import { ShipmentList } from "./shipments/shipment-list";
 
 export const metadata = { title: "Warehouse · RB Collections FBA Dashboard" };
@@ -10,7 +13,7 @@ export const metadata = { title: "Warehouse · RB Collections FBA Dashboard" };
 export default async function WarehousePage() {
   await requireUser();
   const db = getDb();
-  const [all, toBuild] = await Promise.all([listSkus(db), listShipments(db, "requested")]);
+  const [all, toBuild, coming] = await Promise.all([listSkus(db), listShipments(db, "requested"), listOpenChinaOrders(db)]);
   const groups = groupByListing(all);
   return (
     <>
@@ -26,6 +29,9 @@ export default async function WarehousePage() {
           <Link className="button" href="/warehouse/labels">
             Barcode labels
           </Link>
+          <Link className="button" href="/warehouse/receiving">
+            Receiving
+          </Link>
           <Link className="button primary" href="/warehouse/counts">
             Enter stock counts
           </Link>
@@ -38,6 +44,12 @@ export default async function WarehousePage() {
         </div>
       ) : (
         <ShipmentList shipments={toBuild} />
+      )}
+      <h2>Deliveries expected from China</h2>
+      {coming.length === 0 ? (
+        <div className="card muted">No deliveries expected right now.</div>
+      ) : (
+        <ChinaOrderList orders={coming} today={businessToday()} linkBase="/warehouse/receiving" showSupplier={false} />
       )}
       <h2>How each product is packed</h2>
       {groups.length === 0 && <div className="card">No SKUs have been set up yet.</div>}

@@ -3,6 +3,7 @@ import type { Db } from "@/db";
 import { amazonImports, fbaLedgerDaily, forecastSettings } from "@/db/schema";
 import { latestFbaStock, recentSales, type FbaFigures } from "@/lib/amazon/repo";
 import { businessTimeZone } from "@/lib/dates";
+import { onOrderBySku } from "@/lib/china/repo";
 import { sentNotYetReported } from "@/lib/shipments/repo";
 import { listSkus, type SkuWithStock } from "@/lib/skus/repo";
 import { compareUrgency, daysBetween, forecastSku, RULES, type Forecast } from "./rules";
@@ -14,6 +15,8 @@ export type SkuForecast = SkuWithStock & {
   manualNote: string | null;
   /** Units marked sent in this app that Amazon's latest stock report does not show yet (Phase 5). */
   sentNotInReport: number;
+  /** Units ordered from China and not yet received (Phase 6). */
+  onOrder: number;
   forecast: Forecast;
 };
 
@@ -64,13 +67,14 @@ export async function setManualDailySales(
 
 /** Every SKU with its forecast, most urgent first. */
 export async function loadForecastBoard(db: Db, today: string): Promise<ForecastBoard> {
-  const [base, fba, sales, settings, firstDay, sent] = await Promise.all([
+  const [base, fba, sales, settings, firstDay, sent, ordered] = await Promise.all([
     listSkus(db),
     latestFbaStock(db),
     recentSales(db, RULES.salesWindowDays),
     getForecastSettings(db),
     firstLedgerDay(db),
     sentNotYetReported(db),
+    onOrderBySku(db),
   ]);
 
   let salesDays = 0;
@@ -94,10 +98,10 @@ export async function loadForecastBoard(db: Db, today: string): Promise<Forecast
       fba: f ? { available: f.fulfillable, inbound: f.inbound + sentNotInReport } : null,
       stockDay: f ? dayInBusinessZone(f.asOf) : null,
       warehouse: s.warehouseOnHand,
-      onOrder: 0,
+      onOrder: ordered.get(s.id) ?? 0,
       today,
     });
-    return { ...s, fba: f, unitsSold, manualDailySales, manualNote: setting?.note ?? null, sentNotInReport, forecast };
+    return { ...s, fba: f, unitsSold, manualDailySales, manualNote: setting?.note ?? null, sentNotInReport, onOrder: ordered.get(s.id) ?? 0, forecast };
   });
   rows.sort((a, b) => compareUrgency(a.forecast, b.forecast) || a.amazonSku.localeCompare(b.amazonSku));
 
