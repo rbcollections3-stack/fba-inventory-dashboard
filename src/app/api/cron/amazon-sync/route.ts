@@ -2,6 +2,8 @@ import { timingSafeEqual } from "node:crypto";
 import { getDb } from "@/db";
 import { SpApiClient, spApiConfigFromEnv } from "@/lib/amazon/sp-api";
 import { syncAmazon } from "@/lib/amazon/sync";
+import { businessToday } from "@/lib/dates";
+import { recordTodaysForecast } from "@/lib/forecast/check";
 
 // Amazon takes a few minutes to prepare reports, so this run may wait up to 5 minutes.
 export const maxDuration = 300;
@@ -24,10 +26,18 @@ export async function GET(request: Request) {
   if (!authorised(request)) return new Response("Not allowed", { status: 401 });
   const config = spApiConfigFromEnv();
   if (!config) return Response.json({ ok: false, reason: "Amazon keys are not set up" });
-  const outcomes = await syncAmazon(getDb(), new SpApiClient(config), {
+  const db = getDb();
+  const outcomes = await syncAmazon(db, new SpApiClient(config), {
     trigger: "schedule",
-    deadline: Date.now() + (maxDuration - 20) * 1000,
+    deadline: Date.now() + (maxDuration - 30) * 1000,
   });
+  // Keep today's forecast so it can be checked against real sales later (Phase 7).
+  // The first forecast of the day is kept, so the later run changes nothing.
+  try {
+    await recordTodaysForecast(db, businessToday());
+  } catch {
+    // Never fail the Amazon pull over this; the Overview records it too.
+  }
   // Only counts and statuses are returned, never report contents.
   return Response.json({
     ok: outcomes.every((o) => o.status !== "failed"),

@@ -6,7 +6,10 @@ import { businessTimeZone } from "@/lib/dates";
 import { onOrderBySku } from "@/lib/china/repo";
 import { sentNotYetReported } from "@/lib/shipments/repo";
 import { listSkus, type SkuWithStock } from "@/lib/skus/repo";
+import { loadForecastHistory, type ForecastHistory } from "./history";
 import { compareUrgency, daysBetween, forecastSku, RULES, type Forecast } from "./rules";
+import { averageFactor } from "./seasonal";
+import { countBetween } from "./stock-days";
 
 export type SkuForecast = SkuWithStock & {
   fba: FbaFigures | null;
@@ -15,6 +18,8 @@ export type SkuForecast = SkuWithStock & {
   manualNote: string | null;
   /** Units marked sent in this app that Amazon's latest stock report does not show yet (Phase 5). */
   sentNotInReport: number;
+  /** The listing's seasonal percentages by month (Phase 7), or null when none apply. */
+  monthPct: number[] | null;
   /** Units ordered from China and not yet received (Phase 6). */
   onOrder: number;
   forecast: Forecast;
@@ -27,6 +32,8 @@ export type ForecastBoard = {
   /** When the newest FBA stock figures were true. */
   stockAsOf: Date | null;
   today: string;
+  /** Sales history, out-of-stock days and seasonal patterns (Phase 7). */
+  history: ForecastHistory;
 };
 
 /** The calendar day (YYYY-MM-DD) a moment falls on in the business's time zone. */
@@ -67,7 +74,7 @@ export async function setManualDailySales(
 
 /** Every SKU with its forecast, most urgent first. */
 export async function loadForecastBoard(db: Db, today: string): Promise<ForecastBoard> {
-  const [base, fba, sales, settings, firstDay, sent, ordered] = await Promise.all([
+  const [base, fba, sales, settings, firstDay, sent, ordered, history] = await Promise.all([
     listSkus(db),
     latestFbaStock(db),
     recentSales(db, RULES.salesWindowDays),
@@ -75,11 +82,14 @@ export async function loadForecastBoard(db: Db, today: string): Promise<Forecast
     firstLedgerDay(db),
     sentNotYetReported(db),
     onOrderBySku(db),
+    loadForecastHistory(db),
   ]);
 
   let salesDays = 0;
+  let windowStart: string | null = null;
   if (sales) {
     const start = firstDay && firstDay > sales.start ? firstDay : sales.start;
+    windowStart = start;
     salesDays = daysBetween(start, sales.end) + 1;
   }
 
@@ -90,6 +100,12 @@ export async function loadForecastBoard(db: Db, today: string): Promise<Forecast
     const manualDailySales = setting?.manualDailySales ?? null;
     // A shipment marked sent here counts as on the way until Amazon's report shows it.
     const sentNotInReport = sent.get(s.id) ?? 0;
+    // Phase 7: leave out days the SKU had nothing to sell, and apply the listing's seasonal pattern.
+    const h = history.bySku.get(s.id);
+    const outOfStockDays = h && sales && windowStart ? countBetween(h.outOfStock, windowStart, sales.end) : 0;
+    const monthPct = history.seasons.get(s.listingId)?.monthPct ?? null;
+    const season =
+      monthPct && sales && windowStart ? { monthPct, windowFactor: averageFactor(monthPct, windowStart, sales.end) } : null;
     const forecast = forecastSku({
       unitsPerCase: s.unitsPerCase,
       unitsSold,
@@ -100,8 +116,20 @@ export async function loadForecastBoard(db: Db, today: string): Promise<Forecast
       warehouse: s.warehouseOnHand,
       onOrder: ordered.get(s.id) ?? 0,
       today,
+      outOfStockDays,
+      season,
     });
-    return { ...s, fba: f, unitsSold, manualDailySales, manualNote: setting?.note ?? null, sentNotInReport, onOrder: ordered.get(s.id) ?? 0, forecast };
+    return {
+      ...s,
+      fba: f,
+      unitsSold,
+      manualDailySales,
+      manualNote: setting?.note ?? null,
+      sentNotInReport,
+      onOrder: ordered.get(s.id) ?? 0,
+      monthPct,
+      forecast,
+    };
   });
   rows.sort((a, b) => compareUrgency(a.forecast, b.forecast) || a.amazonSku.localeCompare(b.amazonSku));
 
@@ -111,5 +139,6 @@ export async function loadForecastBoard(db: Db, today: string): Promise<Forecast
     sales: sales ? { start: sales.start, end: sales.end, days: salesDays } : null,
     stockAsOf,
     today,
+    history,
   };
 }

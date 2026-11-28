@@ -211,3 +211,66 @@ describe("most urgent first", () => {
     expect([a, b].sort(compareUrgency)).toEqual([b, a]);
   });
 });
+
+describe("Phase 7: out-of-stock days and seasonal pattern", () => {
+  it("leaves out out-of-stock days from the sales rate", () => {
+    // 300 sold in the 20 days in stock = 15 a day, not 10.
+    const f = run({ outOfStockDays: 10 });
+    expect(f.measuredRate).toBe(15);
+    expect(f.dailyRate).toBe(15);
+    expect(f.inStockDays).toBe(20);
+    expect(f.notes.some((n) => n.startsWith("Out of stock 10 of the last 30 days"))).toBe(true);
+  });
+
+  it("explains a SKU out of stock for the whole window", () => {
+    const f = run({ unitsSold: 0, outOfStockDays: 30 });
+    expect(f.dailyRate).toBeNull();
+    expect(f.notes[0]).toMatch(/^Out of stock for all of the last 30 days/);
+  });
+
+  it("marks very few in-stock days as low confidence", () => {
+    expect(run({ outOfStockDays: 25 }).lowConfidence).toBe(true);
+  });
+
+  it("gives the same dates as before with every month at 100%", () => {
+    const flat = run({});
+    const s = run({ season: { monthPct: Array(12).fill(100), windowFactor: 1 } });
+    expect(s.shipBy).toBe(flat.shipBy);
+    expect(s.reorderBy).toBe(flat.reorderBy);
+    expect(s.shipCases).toBe(flat.shipCases);
+    expect(s.reorderCases).toBe(flat.reorderCases);
+  });
+
+  it("ships earlier and more ahead of a busy month", () => {
+    // Stock day Nov 27. 600 units in FBA at 10 a day = 60 days flat, ship-by Dec 5.
+    // With December at 200%: Nov 27-30 sell 40, then 20 a day: 560 left lasts 28 days, cover 32.
+    const pct = Array(12).fill(100);
+    pct[11] = 200;
+    const f = run({ season: { monthPct: pct, windowFactor: 1 } });
+    expect(f.fbaCoverDays).toBeCloseTo(32);
+    expect(f.shipBy).toBe("2026-11-07"); // 32 - 52 = -20 days: overdue
+    expect(f.seasonal).toEqual({ baseRate: 10, windowPct: 100, nowPct: 100 });
+    // Arrives Nov 14 and covers 45 days: Nov 14-30 (17 x 10) + Dec 1-28 (28 x 20) = 730 units = 31 cases of 24.
+    expect(f.shipDemandUnits).toBe(730);
+    expect(f.shipCases).toBe(31);
+  });
+
+  it("turns a busy sales window into a normal rate", () => {
+    // The last 30 days ran at 150%: normal is 10 / 1.5; this month (Nov) at 150% plans 10 a day.
+    const pct = Array(12).fill(100);
+    pct[10] = 150;
+    const f = run({ season: { monthPct: pct, windowFactor: 1.5 } });
+    expect(f.seasonal!.baseRate).toBeCloseTo(10 / 1.5);
+    expect(f.dailyRate).toBeCloseTo(10);
+    // December back to normal: stock lasts longer than 60 days.
+    expect(f.fbaCoverDays!).toBeGreaterThan(60);
+  });
+
+  it("uses a number typed by hand exactly as typed", () => {
+    const pct = Array(12).fill(200);
+    const f = run({ manualDailySales: 5, season: { monthPct: pct, windowFactor: 1 } });
+    expect(f.dailyRate).toBe(5);
+    expect(f.seasonal).toBeNull();
+    expect(f.fbaCoverDays).toBe(120);
+  });
+});

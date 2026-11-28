@@ -309,3 +309,18 @@ ol.sheet-steps li::marker { font-weight: 800; }
   }
   .fnsku-labels .fnsku-label:last-child { break-after: auto; page-break-after: auto; }
 }
+
+/* Phase 7: forecast check */
+.season-block { border-top: 1px solid var(--border); padding-top: 12px; margin-top: 16px; }
+.season-block h3 { margin: 0 0 6px; }
+.season-table { max-width: 560px; }
+.season-table td { vertical-align: middle; }
+.pct-input { width: 5.5em; margin-right: 4px; text-align: right; }
+td.pct-up { color: var(--warn); font-weight: 600; }
+td.pct-down { color: var(--muted); }
+.week-bar { display: inline-block; height: 10px; border-radius: 2px; vertical-align: middle; }
+.week-bar.forecast { background: var(--muted); opacity: 0.45; }
+.week-bar.actual { background: var(--text, #1f2328); }
+.season-block summary { cursor: pointer; padding: 4px 0; }
+.season-block[open] summary { margin-bottom: 8px; }
+input.pct-input { width: 5.5em; display: inline-block; }

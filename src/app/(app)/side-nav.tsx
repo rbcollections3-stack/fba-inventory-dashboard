@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import {
   Barcode,
+  ChartLine,
   ClipboardCheck,
   CloudDownload,
   FileSpreadsheet,
@@ -31,6 +32,7 @@ const SECTIONS: Section[] = [
     items: [
       { href: "/overview", label: "Overview", icon: LayoutDashboard, adminOnly: true },
       { href: "/shipments", label: "Ship to Amazon", icon: Truck, adminOnly: true },
+      { href: "/forecast-check", label: "Forecast check", icon: ChartLine, adminOnly: true },
       { href: "/china", label: "China orders", icon: Ship, adminOnly: true },
     ],
   },

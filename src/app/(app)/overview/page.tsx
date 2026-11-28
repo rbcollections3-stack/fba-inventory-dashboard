@@ -3,6 +3,7 @@ import { getDb } from "@/db";
 import { requireAdmin } from "@/lib/auth/session";
 import { businessToday } from "@/lib/dates";
 import { fmtDate, fmtDays, fmtInt, fmtRate, STATUS_LABEL } from "@/lib/forecast/format";
+import { recordDailyForecast } from "@/lib/forecast/check";
 import { loadForecastBoard, type SkuForecast } from "@/lib/forecast/repo";
 import { RULES } from "@/lib/forecast/rules";
 import { groupByListing } from "@/lib/skus/repo";
@@ -28,7 +29,10 @@ const cases = (n: number | null) => `${fmtInt(n)} ${n === 1 ? "case" : "cases"}`
 export default async function OverviewPage({ searchParams }: PageProps<"/overview">) {
   await requireAdmin();
   const byListing = (await searchParams).view === "listing";
-  const board = await loadForecastBoard(getDb(), businessToday());
+  const db = getDb();
+  const board = await loadForecastBoard(db, businessToday());
+  // Keep today's forecast for the forecast check (only the first one each day is saved).
+  await recordDailyForecast(db, board).catch(() => 0);
   const { rows } = board;
   const count = (s: string) => rows.filter((r) => r.forecast.status === s).length;
   const uncounted = rows.filter((r) => r.warehouseOnHand === null).length;
@@ -180,6 +184,10 @@ function ForecastRow({ r, showListing }: { r: SkuForecast; showListing: boolean 
         {fmtRate(f.dailyRate)}
         {f.rateSource === "manual" && <span className="subtle">entered by hand</span>}
         {f.lowConfidence && <span className="subtle">low confidence</span>}
+        {f.rateSource === "sales" && f.outOfStockDays > 0 && (
+          <span className="subtle">{f.outOfStockDays} days out of stock left out</span>
+        )}
+        {f.seasonal && <span className="subtle">seasonal {f.seasonal.nowPct}%</span>}
       </td>
       <td className="num">
         {fmtInt(r.fba?.fulfillable)}
