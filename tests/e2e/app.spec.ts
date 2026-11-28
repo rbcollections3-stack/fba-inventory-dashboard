@@ -468,6 +468,8 @@ test("admin plans a shipment; staff build it from the pallet sheets and mark it 
 });
 
 test("admin saves a China order; staff receive part of it with a count; admin closes the rest", async ({ browser }) => {
+  // Two logins (with authenticator codes) and a dozen page loads: about 30 seconds locally, longer on CI.
+  test.setTimeout(90_000);
   const page = admin;
   await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "China orders" }).click();
   await expect(page).toHaveURL(/\/china$/);
