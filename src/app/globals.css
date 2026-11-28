@@ -320,7 +320,7 @@ td.pct-up { color: var(--warn); font-weight: 600; }
 td.pct-down { color: var(--muted); }
 .week-bar { display: inline-block; height: 10px; border-radius: 2px; vertical-align: middle; }
 .week-bar.forecast { background: var(--muted); opacity: 0.45; }
-.week-bar.actual { background: var(--accent, #2563eb); }
+.week-bar.actual { background: var(--text, #1f2328); }
 .season-block summary { cursor: pointer; padding: 4px 0; }
 .season-block[open] summary { margin-bottom: 8px; }
 input.pct-input { width: 5.5em; display: inline-block; }

@@ -149,11 +149,13 @@ export default async function ForecastCheckPage() {
             </div>
           </div>
           <div className="stat">
-            <div className="label">Off by (week by week)</div>
+            {/* The look stacks these bottom to top: number first, then the labels. */}
+            <div className="label small">Overall the forecast was {direction(report.total)}.</div>
+            <div className="label">Off by, week by week</div>
             <div className="value" data-testid="total-error">
               {pct(report.total.errorShare)}
             </div>
-            <div className="label">overall the forecast was {direction(report.total)}</div>
+
           </div>
           <div className="stat">
             <div className="label">Rating</div>

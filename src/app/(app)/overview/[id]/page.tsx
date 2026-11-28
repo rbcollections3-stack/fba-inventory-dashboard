@@ -211,7 +211,7 @@ export default async function SkuForecastPage({ params }: PageProps<"/overview/[
                 </tbody>
               </table>
             </div>
-            <p className="small muted">Grey bar = forecast, blue bar = sold.</p>
+            <p className="small muted">Light bar = forecast, dark bar = sold.</p>
           </>
         )}
       </div>
