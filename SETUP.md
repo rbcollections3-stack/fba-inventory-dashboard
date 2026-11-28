@@ -96,6 +96,66 @@ Every person gets their own login. Never share one.
 Passwords expire after 365 days, and the app asks for a new one at the next
 login after that. The **Accounts** screen shows each login's expiry date.
 
+## 5. Connect Amazon (automatic daily reports)
+
+Once this is set up, the app pulls your FBA stock, units inbound to Amazon and
+the last 31 days of daily sales from Amazon every morning, so you no longer
+need to download and upload reports. Uploading still works as a backup.
+
+The connection is **read-only**. The app can only ask Amazon for two reports,
+Manage FBA Inventory and the Inventory Ledger (detailed view). It cannot change
+listings, prices, shipments or anything else, and it never asks for customer
+names or addresses. Your app in Seller Central needs the **Amazon Fulfillment**
+role ticked.
+
+You need the three keys you saved in your password manager: the **Client ID**,
+the **Client Secret** and the **Refresh Token**. Type or paste them only into
+Vercel, never into chat, email or a file.
+
+1. In Vercel, open the project, then **Settings > Environment Variables**.
+2. Add each of these. For each one, tick **Production** and **Preview**, and
+   switch on **Sensitive** so nobody can read the value back later.
+
+   | Name | Value |
+   | --- | --- |
+   | `SP_API_CLIENT_ID` | the Client ID (starts with `amzn1.application-oa2-client.`) |
+   | `SP_API_CLIENT_SECRET` | the Client Secret |
+   | `SP_API_REFRESH_TOKEN` | the Refresh Token (starts with `Atzr|`) |
+   | `CRON_SECRET` | a new random string of 32 or more letters and numbers, made with your password manager's "generate password". It stops strangers from starting the daily pull. You never need to type it anywhere else. |
+
+3. Open **Deployments**, click the three dots next to the newest deployment
+   and choose **Redeploy**. New settings only take effect after a redeploy.
+4. Log in to the dashboard, open **Amazon**, and press
+   **Refresh from Amazon now**. Amazon takes 1 to 5 minutes to prepare the
+   reports. If the page says Amazon is still preparing them, wait a few
+   minutes and reload the page. Both rows should then show **OK**.
+
+The daily pull runs at about 5 AM and again at about 7 AM Pacific, an hour later in summer (the second
+run only finishes anything Amazon was slow with). Vercel runs it on the live
+site only, not on previews. On the free Hobby plan Vercel may start it any time
+within that hour.
+
+**Previews share the live database**, so pressing Refresh on a preview link
+loads Amazon's numbers into your live data. That is safe: it is the same data
+the live site would load.
+
+**If the Amazon box shows "Failed":** the message under **Problem** says why.
+The common ones:
+
+- *did not accept the Client ID or Client Secret*, or *did not accept the
+  Refresh Token*: a key was mistyped or has a space at the end. Re-enter it in
+  Vercel and redeploy. If you re-authorised the app in Seller Central, the
+  Refresh Token changed: use the new one.
+- *refused access (403)*: the app is missing the **Amazon Fulfillment** role,
+  or the role was added after the Refresh Token was made. In Seller Central go
+  to **Apps and Services > Develop Apps**, check the role, then authorise the
+  app again to get a new Refresh Token and put that in Vercel.
+
+**Canada and other marketplaces.** The app reads Amazon.com (US) only for now.
+Optional settings `SP_API_MARKETPLACE_ID` (default `ATVPDKIKX0DER`, US) and
+`SP_API_REGION` (default `na`) exist so another marketplace can be added
+later without a rewrite.
+
 ## Costs and the "database not publicly reachable" question
 
 Check the current pricing pages before you rely on these.

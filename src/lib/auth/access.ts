@@ -6,7 +6,11 @@ import type { Role } from "@/db/schema";
  */
 export const STAFF_PATH_PREFIXES = ["/warehouse"] as const;
 
-export const PUBLIC_PATHS = ["/login"] as const;
+/**
+ * Open without a login. The cron path is called by Vercel's scheduler and
+ * checks its own secret (CRON_SECRET) instead.
+ */
+export const PUBLIC_PATHS = ["/login", "/api/cron"] as const;
 
 function matches(pathname: string, prefix: string): boolean {
   return pathname === prefix || pathname.startsWith(prefix + "/");

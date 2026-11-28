@@ -2,5 +2,15 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
   "buildCommand": "npm run vercel-build",
-  "installCommand": "npm ci"
+  "installCommand": "npm ci",
+  "crons": [
+    {
+      "path": "/api/cron/amazon-sync",
+      "schedule": "0 13 * * *"
+    },
+    {
+      "path": "/api/cron/amazon-sync",
+      "schedule": "0 15 * * *"
+    }
+  ]
 }

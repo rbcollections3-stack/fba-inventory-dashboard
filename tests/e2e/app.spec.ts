@@ -282,3 +282,19 @@ test("admin uploads both Amazon reports and sees FBA stock, inbound and sales pe
   await page.getByRole("button", { name: "Upload" }).click();
   await expect(page.locator(".alert.error")).toContainText("not one of the Amazon reports");
 });
+
+// Phase 3: the automatic Amazon connection. No Amazon keys are set in tests.
+test("Amazon page shows the connection is not set up, and the daily pull needs its secret", async ({ request }) => {
+  const page = admin;
+  await page.goto("/amazon");
+  const box = page.getByTestId("amazon-connection");
+  await expect(box).toContainText("Not set up");
+  await expect(box).toContainText("SP_API_CLIENT_ID");
+  await expect(page.getByTestId("sync-fba_inventory")).toContainText("Never pulled");
+  await expect(page.getByTestId("refresh-amazon")).toBeDisabled();
+
+  const noSecret = await request.get("/api/cron/amazon-sync");
+  expect(noSecret.status()).toBe(401);
+  const wrong = await request.get("/api/cron/amazon-sync", { headers: { authorization: "Bearer wrong" } });
+  expect(wrong.status()).toBe(401);
+});

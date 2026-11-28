@@ -209,3 +209,43 @@ export type User = typeof users.$inferSelect;
 export type Role = (typeof roleEnum.enumValues)[number];
 export type Sku = typeof skus.$inferSelect;
 export type Listing = typeof listings.$inferSelect;
+
+/**
+ * Reports the app has asked Amazon for through the Selling Partner API.
+ * Amazon takes a few minutes to prepare a report, so a request is saved here
+ * and picked up on the next check once Amazon says it is ready.
+ * status: requested (waiting for Amazon), saved (loaded into the app),
+ * no_data (Amazon had nothing for that period), failed (see message).
+ */
+export const amazonSyncRequests = pgTable(
+  "amazon_sync_requests",
+  {
+    id: serial("id").primaryKey(),
+    kind: amazonReportKindEnum("kind").notNull(),
+    /** Amazon's report type, for example GET_LEDGER_DETAIL_VIEW_DATA. */
+    reportType: text("report_type").notNull(),
+    /** Amazon's report id. Blank only for a moment while the request is sent. */
+    amazonReportId: text("amazon_report_id"),
+    /** "schedule" for the daily pull, "manual" for the Refresh button. */
+    trigger: text("trigger").notNull(),
+    status: text("status").notNull().default("requested"),
+    dataStart: timestamp("data_start", { withTimezone: true }),
+    dataEnd: timestamp("data_end", { withTimezone: true }),
+    message: text("message"),
+    importId: integer("import_id").references(() => amazonImports.id, { onDelete: "set null" }),
+    requestedBy: integer("requested_by").references(() => users.id, { onDelete: "set null" }),
+    requestedAt: timestamp("requested_at", { withTimezone: true }).notNull().defaultNow(),
+    /** Last time the app asked Amazon whether the report is ready. */
+    checkedAt: timestamp("checked_at", { withTimezone: true }),
+    finishedAt: timestamp("finished_at", { withTimezone: true }),
+  },
+  (t) => [
+    // At most one report of each kind waiting on Amazon at a time.
+    uniqueIndex("amazon_sync_requests_one_waiting").on(t.kind).where(sql`${t.status} = 'requested'`),
+    index("amazon_sync_requests_kind_idx").on(t.kind, t.requestedAt),
+    check(
+      "amazon_sync_requests_status_valid",
+      sql`${t.status} in ('requested', 'saved', 'no_data', 'failed')`,
+    ),
+  ],
+);
