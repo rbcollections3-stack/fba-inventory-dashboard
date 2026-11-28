@@ -13,6 +13,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             RB Collections
           </Link>
           <nav className="nav" aria-label="Main">
+            {isAdmin && <Link href="/overview">Overview</Link>}
             {isAdmin && <Link href="/skus">SKUs</Link>}
             {isAdmin && <Link href="/skus/import">Import spreadsheet</Link>}
             {isAdmin && <Link href="/amazon">Amazon reports</Link>}

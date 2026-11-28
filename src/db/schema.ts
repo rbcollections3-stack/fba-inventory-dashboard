@@ -4,6 +4,7 @@ import {
   date,
   index,
   integer,
+  numeric,
   pgEnum,
   pgTable,
   serial,
@@ -248,4 +249,23 @@ export const amazonSyncRequests = pgTable(
       sql`${t.status} in ('requested', 'saved', 'no_data', 'failed')`,
     ),
   ],
+);
+
+/**
+ * Per-SKU forecast settings (Phase 4). One row per SKU at most; a SKU with no
+ * row plans from its real Amazon sales.
+ */
+export const forecastSettings = pgTable(
+  "forecast_settings",
+  {
+    skuId: integer("sku_id")
+      .primaryKey()
+      .references(() => skus.id, { onDelete: "cascade" }),
+    /** Expected units sold per day, typed in by hand. Used instead of real sales while set. */
+    manualDailySales: numeric("manual_daily_sales", { precision: 10, scale: 2, mode: "number" }),
+    note: text("note"),
+    updatedBy: integer("updated_by").references(() => users.id, { onDelete: "set null" }),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [check("forecast_settings_manual_positive", sql`${t.manualDailySales} is null or ${t.manualDailySales} > 0`)],
 );

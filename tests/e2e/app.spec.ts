@@ -58,7 +58,7 @@ test("first admin login: password, authenticator setup, then a new password", as
   await admin.getByLabel("New password").fill(ADMIN_PW);
   await admin.getByLabel("Type it again").fill(ADMIN_PW);
   await admin.getByRole("button", { name: "Save password" }).click();
-  await expect(admin).toHaveURL(/\/skus$/);
+  await expect(admin).toHaveURL(/\/overview$/);
 
   // The first password no longer works.
   await enterPassword(page, "admin", ADMIN_FIRST);
@@ -133,7 +133,7 @@ test("warehouse staff only see the warehouse screen", async ({ browser }) => {
   await expect(page.getByTestId("wh-card")).toHaveCount(21);
   await expect(page.getByRole("navigation", { name: "Main" }).getByRole("link")).toHaveText(["Warehouse", "Stock counts"]);
 
-  for (const p of ["/skus", "/skus/import", "/skus/1", "/accounts", "/amazon", "/"]) {
+  for (const p of ["/overview", "/overview/1", "/skus", "/skus/import", "/skus/1", "/accounts", "/amazon", "/"]) {
     await page.goto(p);
     await expect(page).toHaveURL(/\/warehouse$/);
   }
@@ -297,4 +297,49 @@ test("Amazon page shows the connection is not set up, and the daily pull needs i
   expect(noSecret.status()).toBe(401);
   const wrong = await request.get("/api/cron/amazon-sync", { headers: { authorization: "Bearer wrong" } });
   expect(wrong.status()).toBe(401);
+});
+
+// Phase 4: the forecast and Overview. Uses the reports uploaded above.
+test("Overview shows dates per SKU, and expected daily sales can be entered by hand", async () => {
+  const page = admin;
+  await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Overview" }).click();
+  await expect(page).toHaveURL(/\/overview$/);
+  await expect(page.getByTestId("forecast-row")).toHaveCount(21);
+  await expect(page.getByTestId("forecast-basis")).toContainText("Oct 2, 2026 to Oct 31, 2026 (30 days)");
+
+  // EX-TOTE-BLK sold 4 in 30 days and has 360 units in or on the way to FBA: far from due.
+  const blk = page.getByTestId("forecast-row").filter({ hasText: "EX-TOTE-BLK" });
+  await expect(blk).toHaveAttribute("data-status", "green");
+  await expect(blk.getByTestId("rate-cell")).toHaveText("0.1");
+  await expect(blk.getByTestId("ship-by")).toContainText("1 case (12 units)");
+
+  // A SKU with no sales shows no dates and a note.
+  const tote = page.getByTestId("forecast-row").filter({ hasText: "EX-TOTE-RED" });
+  await expect(tote).toHaveAttribute("data-status", "none");
+  await expect(tote).toContainText("No sales in the last 30 days");
+
+  // Enter 10 a day by hand. It has no FBA stock, so shipping is overdue.
+  await tote.getByRole("link", { name: "EX-TOTE-RED" }).click();
+  await expect(page.getByRole("heading", { name: /EX-TOTE-RED/ })).toBeVisible();
+  await page.getByLabel("Expected units sold per day").fill("ten");
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(page.locator(".alert.error")).toContainText("Enter units per day as a number");
+  await page.getByLabel("Expected units sold per day").fill("10");
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(page.getByText("Saved. The dates now use your number.")).toBeVisible();
+  await expect(page.getByTestId("calc-table")).toContainText("Expected daily sales you entered");
+
+  await page.goto("/overview");
+  const after = page.getByTestId("forecast-row").filter({ hasText: "EX-TOTE-RED" });
+  await expect(after).toHaveAttribute("data-status", "red");
+  await expect(after.getByTestId("rate-cell")).toContainText("entered by hand");
+  // Most urgent first: the red SKU is now at the top.
+  await expect(page.getByTestId("forecast-row").first()).toContainText("EX-TOTE-RED");
+
+  // Clearing it goes back to real sales.
+  await after.getByRole("link", { name: "EX-TOTE-RED" }).click();
+  await page.getByRole("button", { name: "Clear and use real sales" }).click();
+  await expect(page.getByText("Cleared. The dates now use real Amazon sales.")).toBeVisible();
+  await page.goto("/overview?view=listing");
+  await expect(page.getByTestId("forecast-row").filter({ hasText: "EX-TOTE-RED" })).toHaveAttribute("data-status", "none");
 });

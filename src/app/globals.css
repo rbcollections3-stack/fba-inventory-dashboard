@@ -185,3 +185,29 @@ tr.row-error td { background: var(--danger-bg); }
 .error-text { color: var(--danger); }
 .subtle-error { display: block; font-size: 0.8rem; white-space: normal; }
 button.big { padding: 12px 22px; font-size: 1.05rem; }
+
+/* Phase 4: forecast overview */
+.status { display: inline-block; min-width: 72px; text-align: center; padding: 2px 8px; border-radius: 999px; font-size: 0.8rem; font-weight: 600; }
+.status.red { background: var(--danger-bg); color: var(--danger); }
+.status.yellow { background: var(--warn-bg); color: var(--warn); }
+.status.green { background: var(--ok-bg); color: var(--ok); }
+.status.none { background: var(--bg); color: var(--muted); border: 1px solid var(--border); }
+tr.row-red td:first-child { box-shadow: inset 4px 0 0 var(--danger); }
+tr.row-yellow td:first-child { box-shadow: inset 4px 0 0 #d99a00; }
+tr.row-green td:first-child { box-shadow: inset 4px 0 0 var(--ok); }
+td.date-red { color: var(--danger); font-weight: 700; }
+td.date-yellow { color: var(--warn); font-weight: 700; }
+.provisional { color: var(--muted); font-style: italic; }
+td.notes { white-space: normal; min-width: 220px; max-width: 340px; font-size: 0.85rem; }
+td.notes ul { margin: 0; padding-left: 16px; }
+.toggle { display: inline-flex; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+.toggle a { padding: 6px 12px; text-decoration: none; color: var(--text); background: var(--surface); }
+.toggle a[aria-current="true"] { background: var(--accent); color: var(--accent-text); }
+.calc td, .calc th { white-space: normal; }
+.calc td.result { font-weight: 700; white-space: nowrap; }
+.bleed { width: calc(100vw - 32px); max-width: 1680px; position: relative; left: 50%; transform: translateX(-50%); }
+@media (max-width: 1232px) { .bleed { width: auto; left: 0; transform: none; } }
+.field { align-content: start; }
+table.forecast th { white-space: normal; vertical-align: bottom; max-width: 110px; }
+table.forecast td { padding: 8px; }
+table.forecast td.notes { min-width: 200px; max-width: 280px; }
