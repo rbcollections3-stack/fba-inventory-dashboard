@@ -131,9 +131,9 @@ test("warehouse staff only see the warehouse screen", async ({ browser }) => {
   await fullLogin(page, "warehouse", STAFF_FIRST, STAFF_PW);
   await expect(page).toHaveURL(/\/warehouse$/);
   await expect(page.getByTestId("wh-card")).toHaveCount(21);
-  await expect(page.getByRole("navigation", { name: "Main" }).getByRole("link")).toHaveText(["Warehouse", "Pallet sheets", "Barcode labels", "Stock counts"]);
+  await expect(page.getByRole("navigation", { name: "Main" }).getByRole("link")).toHaveText(["Warehouse", "Pallet sheets", "Barcode labels", "Receiving", "Stock counts"]);
 
-  for (const p of ["/overview", "/overview/1", "/shipments", "/skus", "/skus/import", "/skus/1", "/accounts", "/amazon", "/"]) {
+  for (const p of ["/overview", "/overview/1", "/shipments", "/china", "/skus", "/skus/import", "/skus/1", "/accounts", "/amazon", "/"]) {
     await page.goto(p);
     await expect(page).toHaveURL(/\/warehouse$/);
   }
@@ -465,4 +465,92 @@ test("admin plans a shipment; staff build it from the pallet sheets and mark it 
   // A sent shipment cannot be sent again.
   await staff.goto(sheetUrl + "/send");
   await expect(staff).toHaveURL(sheetUrl);
+});
+
+test("admin saves a China order; staff receive part of it with a count; admin closes the rest", async ({ browser }) => {
+  const page = admin;
+  await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "China orders" }).click();
+  await expect(page).toHaveURL(/\/china$/);
+  await expect(page.getByTestId("no-china-orders")).toBeVisible();
+  await expect(page.getByTestId("order-row")).toHaveCount(21);
+
+  for (const box of await page.getByRole("checkbox", { checked: true }).all()) await box.uncheck();
+  await page.getByLabel("Cases of X001 to order").fill("30");
+  await expect(page.getByLabel("Order X001")).toBeChecked();
+  await expect(page.getByTestId("order-total-cases")).toContainText("30");
+  await page.getByLabel("Supplier (optional)").fill("Example Textiles");
+  await page.getByLabel("Supplier order or PO number (optional)").fill("PO-1001");
+  // An order date in the future is refused.
+  await page.getByLabel("Date the order was placed").evaluate((el: HTMLInputElement) => el.removeAttribute("max"));
+  await page.getByLabel("Date the order was placed").fill("2099-01-01");
+  await page.getByTestId("save-order").click();
+  await expect(page.locator(".alert.error").first()).toContainText("Nothing was saved");
+  await expect(page.getByText("The order date cannot be in the future.")).toBeVisible();
+  await expect(page.getByLabel("Supplier (optional)")).toHaveValue("Example Textiles");
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" });
+  await page.getByLabel("Date the order was placed").fill(today);
+  if (SHOTS) await page.screenshot({ path: path.join(SHOTS, "china-1-plan-order.png"), fullPage: true });
+  await page.getByTestId("save-order").click();
+
+  await expect(page).toHaveURL(/\/china\/\d+\?new=1$/);
+  await expect(page.getByTestId("order-saved")).toBeVisible();
+  await expect(page.getByTestId("china-order-status")).toHaveText("On the way");
+  await expect(page.getByTestId("china-line")).toHaveCount(1);
+  await expect(page.getByTestId("china-line")).toContainText("360");
+  const orderUrl = page.url().replace(/\?.*$/, "");
+  const orderId = orderUrl.split("/").pop()!;
+  if (SHOTS) await page.screenshot({ path: path.join(SHOTS, "china-2-order-saved.png"), fullPage: true });
+
+  // The units now count as on order in the forecast.
+  await page.goto("/china");
+  await expect(page.getByTestId("china-order-row")).toHaveCount(1);
+  await expect(page.getByTestId("order-row").filter({ hasText: "X001" })).toContainText("360");
+
+  // Warehouse staff see the delivery coming and receive part of it.
+  const staff = await newPage(browser);
+  await fullLogin(staff, "warehouse", "Brand-new-staff-5%");
+  await expect(staff.getByText("Deliveries expected from China")).toBeVisible();
+  await staff.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Receiving" }).click();
+  await expect(staff).toHaveURL(/\/warehouse\/receiving$/);
+  await expect(staff.getByTestId("china-order-row")).toContainText("X001 x 30");
+  await expect(staff.getByTestId("china-order-row")).not.toContainText("PO-1001");
+  await staff.getByTestId("china-order-row").getByRole("link").first().click();
+  await expect(staff).toHaveURL(new RegExp(`/warehouse/receiving/${orderId}$`));
+  // Staff cannot open the admin's China screens.
+  await staff.goto(orderUrl);
+  await expect(staff).toHaveURL(/\/warehouse$/);
+  await staff.goto(`/warehouse/receiving/${orderId}`);
+
+  await staff.getByTestId("confirm-received").click();
+  await expect(staff.locator(".alert.error")).toContainText("Nothing was saved");
+  // Last count was 3 units. 20 cases of 12 arrive: the shelf fills in as 20 cases + 3 loose.
+  await staff.getByLabel("Full cases of X001 that arrived").fill("20");
+  await expect(staff.getByLabel("Full cases of X001 on the shelf now")).toHaveValue("20");
+  await expect(staff.getByLabel("Loose units of X001 on the shelf now")).toHaveValue("3");
+  await expect(staff.getByTestId("receive-row")).toContainText("10 fewer than expected");
+  if (SHOTS) {
+    await staff.setViewportSize({ width: 1024, height: 1366 });
+    await staff.screenshot({ path: path.join(SHOTS, "china-3-receive-tablet.png"), fullPage: true });
+  }
+  await staff.getByTestId("confirm-received").click();
+  await expect(staff.getByTestId("received-confirmation")).toContainText("stays open for the next delivery");
+  await expect(staff.getByTestId("receive-status")).toHaveText("Part received");
+
+  await staff.goto("/warehouse/counts");
+  await expect(staff.getByTestId("count-row").filter({ hasText: "X001" })).toContainText("243");
+  await expect(staff.getByText(`after China order #${orderId} arrived`)).toBeVisible();
+
+  // The admin sees 10 cases still to come, then closes the order.
+  await page.goto(orderUrl);
+  await expect(page.getByTestId("china-order-status")).toHaveText("Part received");
+  await expect(page.getByTestId("delivery-row")).toHaveCount(1);
+  await expect(page.getByTestId("cancel-order")).toHaveCount(0);
+  await page.getByTestId("close-order").click();
+  await expect(page.getByTestId("china-order-status")).toHaveText("Received");
+  await page.goto("/china");
+  await expect(page.getByTestId("no-china-orders")).toBeVisible();
+  await expect(page.getByTestId("order-row").filter({ hasText: "X001" })).not.toContainText("360");
+
+  await staff.goto(`/warehouse/receiving/${orderId}`);
+  await expect(staff.getByTestId("order-done")).toBeVisible();
 });

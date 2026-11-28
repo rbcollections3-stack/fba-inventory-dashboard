@@ -15,12 +15,14 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <nav className="nav" aria-label="Main">
             {isAdmin && <Link href="/overview">Overview</Link>}
             {isAdmin && <Link href="/shipments">Ship to Amazon</Link>}
+            {isAdmin && <Link href="/china">China orders</Link>}
             {isAdmin && <Link href="/skus">SKUs</Link>}
             {isAdmin && <Link href="/skus/import">Import spreadsheet</Link>}
             {isAdmin && <Link href="/amazon">Amazon reports</Link>}
             <Link href="/warehouse">Warehouse</Link>
             <Link href="/warehouse/shipments">Pallet sheets</Link>
             <Link href="/warehouse/labels">Barcode labels</Link>
+            <Link href="/warehouse/receiving">Receiving</Link>
             <Link href="/warehouse/counts">Stock counts</Link>
             {isAdmin && <Link href="/accounts">Accounts</Link>}
           </nav>

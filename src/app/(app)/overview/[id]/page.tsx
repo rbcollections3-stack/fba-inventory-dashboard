@@ -60,7 +60,7 @@ export default async function SkuForecastPage({ params }: PageProps<"/overview/[
         "Total cover",
         `(${fmtInt(r.fba.fulfillable)} + ${fmtInt(r.fba.inbound + r.sentNotInReport)} + ${
           r.warehouseOnHand === null ? "0 warehouse, not counted" : `${fmtInt(r.warehouseOnHand)} warehouse`
-        } + 0 on order) / ${fmtRate(rate)}`,
+        } + ${fmtInt(r.onOrder)} on order from China) / ${fmtRate(rate)}`,
         `${fmtDays(f.totalCoverDays)} days`,
       ],
       [

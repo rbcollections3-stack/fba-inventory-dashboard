@@ -78,6 +78,7 @@ export default async function CountsPage() {
                   <td>
                     {h.source === "import" ? "SKU spreadsheet" : (h.by ?? "-")}
                     {h.source === "shipment" && <span className="subtle">after shipment #{h.shipmentId ?? "?"} left</span>}
+                    {h.source === "china_order" && <span className="subtle">after China order #{h.chinaOrderId ?? "?"} arrived</span>}
                   </td>
                 </tr>
               ))}
