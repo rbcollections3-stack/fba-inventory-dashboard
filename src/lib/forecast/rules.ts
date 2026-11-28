@@ -60,6 +60,17 @@ export type ForecastInput = {
   onOrder: number;
   /** Today in the business's time zone (YYYY-MM-DD). Only used for colours. */
   today: string;
+  /**
+   * Days in the sales window when the SKU was out of stock (Phase 7). They are
+   * left out, so the rate is units sold / days in stock. Default 0.
+   */
+  outOfStockDays?: number;
+  /**
+   * The listing's seasonal pattern (Phase 7): percentage per calendar month
+   * (index 0 = January) and the average multiplier over the sales window. Only
+   * used when planning from real sales; a number typed by hand is used as is.
+   */
+  season?: { monthPct: number[]; windowFactor: number } | null;
 };
 
 export type Status = "red" | "yellow" | "green" | "none";
@@ -70,8 +81,19 @@ export type Forecast = {
   rateSource: "sales" | "manual" | "none";
   /** Units per day from real sales, shown next to a manual number for comparison. */
   measuredRate: number | null;
-  /** Fewer than 30 days of sales history. */
+  /** Fewer than 30 days of sales history, or very few days in stock. */
   lowConfidence: boolean;
+  /** Days in the sales window the SKU was in stock / out of stock. */
+  inStockDays: number;
+  outOfStockDays: number;
+  /**
+   * Set when a seasonal pattern changed the plan: the "normal month" rate,
+   * and how busy the sales window and the stock day's month are (100 = normal).
+   */
+  seasonal: { baseRate: number; windowPct: number; nowPct: number } | null;
+  /** Units of sales the next shipment / China order has to cover, before rounding to cases. */
+  shipDemandUnits: number | null;
+  reorderDemandUnits: number | null;
   fbaUnits: number | null;
   fbaCoverDays: number | null;
   totalUnits: number | null;
@@ -129,10 +151,38 @@ function worst(a: Status, b: Status): Status {
   return RANK[a] >= RANK[b] ? a : b;
 }
 
+/** Multiplier for a day's calendar month (150% = 1.5). */
+function monthFactor(monthPct: number[], day: string): number {
+  return monthPct[Number(day.slice(5, 7)) - 1] / 100;
+}
+
+/** How many days `units` last when day i (from 0) sells rateOn(i). Partial last day included. */
+export function coverDaysVarying(units: number, rateOn: (i: number) => number, maxDays = 3650): number {
+  let left = units;
+  for (let i = 0; i < maxDays; i++) {
+    const rate = rateOn(i);
+    if (rate > 0 && left < rate) return i + left / rate;
+    left -= rate;
+  }
+  return maxDays;
+}
+
+/** Units sold over `days` days starting at day `from` (from 0). */
+export function demandOver(rateOn: (i: number) => number, from: number, days: number): number {
+  let sum = 0;
+  for (let i = from; i < from + days; i++) sum += rateOn(i);
+  return Math.round(sum * 1e6) / 1e6;
+}
+
+/** Fewer days in stock than this in the window makes the rate low confidence. */
+const MIN_IN_STOCK_DAYS = 7;
+
 export function forecastSku(input: ForecastInput, r: Rules = RULES): Forecast {
   const notes: string[] = [];
+  const outOfStockDays = Math.min(Math.max(input.outOfStockDays ?? 0, 0), input.salesDays);
+  const inStockDays = input.salesDays - outOfStockDays;
   const measuredRate =
-    input.unitsSold !== null && input.salesDays > 0 && input.unitsSold > 0 ? input.unitsSold / input.salesDays : null;
+    input.unitsSold !== null && inStockDays > 0 && input.unitsSold > 0 ? input.unitsSold / inStockDays : null;
 
   let dailyRate: number | null = null;
   let rateSource: Forecast["rateSource"] = "none";
@@ -143,7 +193,22 @@ export function forecastSku(input: ForecastInput, r: Rules = RULES): Forecast {
     dailyRate = measuredRate;
     rateSource = "sales";
   }
-  const lowConfidence = rateSource === "sales" && input.salesDays < r.salesWindowDays;
+  const lowConfidence =
+    rateSource === "sales" && (input.salesDays < r.salesWindowDays || inStockDays < MIN_IN_STOCK_DAYS);
+
+  // The seasonal pattern only reshapes a rate measured from real sales.
+  const season = rateSource === "sales" && input.season && input.season.windowFactor > 0 ? input.season : null;
+  const baseRate = season && dailyRate !== null ? dailyRate / season.windowFactor : null;
+  const planDay = input.stockDay ?? input.today;
+  let seasonal: Forecast["seasonal"] = null;
+  if (season && baseRate !== null) {
+    seasonal = {
+      baseRate,
+      windowPct: Math.round(season.windowFactor * 100),
+      nowPct: Math.round(monthFactor(season.monthPct, planDay) * 100),
+    };
+    dailyRate = baseRate * monthFactor(season.monthPct, planDay);
+  }
 
   const fbaUnits = input.fba ? input.fba.available + input.fba.inbound : null;
   const totalUnits = fbaUnits === null ? null : fbaUnits + (input.warehouse ?? 0) + input.onOrder;
@@ -153,6 +218,11 @@ export function forecastSku(input: ForecastInput, r: Rules = RULES): Forecast {
     rateSource,
     measuredRate,
     lowConfidence,
+    inStockDays,
+    outOfStockDays,
+    seasonal,
+    shipDemandUnits: null,
+    reorderDemandUnits: null,
     fbaUnits,
     fbaCoverDays: null,
     totalUnits,
@@ -176,7 +246,9 @@ export function forecastSku(input: ForecastInput, r: Rules = RULES): Forecast {
     notes.push(
       input.unitsSold === null
         ? "No Amazon sales loaded yet, so no dates."
-        : `No sales in the last ${input.salesDays} days, so no dates. Enter expected daily sales to plan this SKU.`,
+        : inStockDays === 0
+          ? `Out of stock for all of the last ${input.salesDays} days, so there are no sales to plan from. Enter expected daily sales to plan this SKU.`
+          : `No sales in the last ${input.salesDays} days, so no dates. Enter expected daily sales to plan this SKU.`,
     );
     return empty;
   }
@@ -185,13 +257,34 @@ export function forecastSku(input: ForecastInput, r: Rules = RULES): Forecast {
     return empty;
   }
 
-  const fbaCoverDays = fbaUnits / dailyRate;
-  const totalCoverDays = totalUnits / dailyRate;
+  const stockDay = input.stockDay;
+  const flatRate = dailyRate;
+  // Units sold on day i counted from the stock day. With a seasonal pattern each
+  // day sells at the normal-month rate times its own month's percentage.
+  const rateOn =
+    season && baseRate !== null
+      ? (i: number) => baseRate * monthFactor(season.monthPct, addDays(stockDay, i))
+      : () => flatRate;
+  const fbaCoverDays = season ? coverDaysVarying(fbaUnits, rateOn) : fbaUnits / dailyRate;
+  const totalCoverDays = season ? coverDaysVarying(totalUnits, rateOn) : totalUnits / dailyRate;
   // Round down so a date is never later than the rule allows.
-  const shipBy = addDays(input.stockDay, Math.floor(fbaCoverDays - shipPointDays(r) + 1e-9));
-  const reorderBy = addDays(input.stockDay, Math.floor(totalCoverDays - reorderPointDays(r) + 1e-9));
-  const shipCases = casesFor(r.shipmentCoverDays, dailyRate, input.unitsPerCase);
-  const reorderCases = casesFor(r.chinaOrderCoverDays, dailyRate, input.unitsPerCase);
+  const shipOffset = Math.floor(fbaCoverDays - shipPointDays(r) + 1e-9);
+  const reorderOffset = Math.floor(totalCoverDays - reorderPointDays(r) + 1e-9);
+  const shipBy = addDays(input.stockDay, shipOffset);
+  const reorderBy = addDays(input.stockDay, reorderOffset);
+  // The shipment covers the 45 days after it arrives; the China order the 120 days after it lands.
+  const shipDemandUnits = season
+    ? demandOver(rateOn, shipOffset + r.warehouseToFbaDays, r.shipmentCoverDays)
+    : Math.round(r.shipmentCoverDays * dailyRate * 1e6) / 1e6;
+  const reorderDemandUnits = season
+    ? demandOver(rateOn, reorderOffset + r.chinaLeadDays, r.chinaOrderCoverDays)
+    : Math.round(r.chinaOrderCoverDays * dailyRate * 1e6) / 1e6;
+  const shipCases = season
+    ? Math.ceil(shipDemandUnits / input.unitsPerCase)
+    : casesFor(r.shipmentCoverDays, dailyRate, input.unitsPerCase);
+  const reorderCases = season
+    ? Math.ceil(reorderDemandUnits / input.unitsPerCase)
+    : casesFor(r.chinaOrderCoverDays, dailyRate, input.unitsPerCase);
 
   const shipStatus = statusFor(shipBy, input.today, r.shipSoonDays);
   let reorderStatus = statusFor(reorderBy, input.today, r.reorderSoonDays);
@@ -229,13 +322,31 @@ export function forecastSku(input: ForecastInput, r: Rules = RULES): Forecast {
   }
 
   if (rateSource === "manual") notes.push("Planned from expected daily sales you entered.");
-  if (lowConfidence) notes.push(`Only ${input.salesDays} days of sales history, so this forecast is low confidence.`);
+  if (rateSource === "sales" && outOfStockDays > 0) {
+    notes.push(
+      `Out of stock ${outOfStockDays} of the last ${input.salesDays} days. The sales rate counts only the ${inStockDays} days it was in stock.`,
+    );
+  }
+  if (seasonal) {
+    notes.push(
+      `Seasonal pattern on: the last ${input.salesDays} days ran at ${seasonal.windowPct}% of a normal month, this month is planned at ${seasonal.nowPct}%.`,
+    );
+  }
+  if (lowConfidence) {
+    notes.push(
+      input.salesDays < r.salesWindowDays
+        ? `Only ${input.salesDays} days of sales history, so this forecast is low confidence.`
+        : `In stock only ${inStockDays} of the last ${input.salesDays} days, so this forecast is low confidence.`,
+    );
+  }
 
   return {
     ...empty,
     fbaCoverDays,
     totalCoverDays,
     shipBy,
+    shipDemandUnits,
+    reorderDemandUnits,
     shipCases,
     shipUnits: shipCases * input.unitsPerCase,
     warehouseShort,

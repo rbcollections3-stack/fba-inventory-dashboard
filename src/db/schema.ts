@@ -9,6 +9,7 @@ import {
   numeric,
   pgEnum,
   pgTable,
+  primaryKey,
   serial,
   text,
   timestamp,
@@ -340,3 +341,60 @@ export const shipmentLines = pgTable(
 
 export type Shipment = typeof shipments.$inferSelect;
 export type ShipmentStatus = "requested" | "sent" | "cancelled";
+
+/**
+ * The forecast the app made for each SKU each day (Phase 7), so it can later
+ * be checked against what actually sold. Written once a day by the morning
+ * Amazon pull and the first time the Overview opens that day.
+ */
+export const forecastDailyLog = pgTable(
+  "forecast_daily_log",
+  {
+    skuId: integer("sku_id")
+      .notNull()
+      .references(() => skus.id, { onDelete: "cascade" }),
+    day: date("day", { mode: "string" }).notNull(),
+    /** Units a day the dates were planned from that day. Null when there was nothing to plan from. */
+    plannedRate: numeric("planned_rate", { precision: 12, scale: 4, mode: "number" }),
+    /** "sales", "manual" or "none". */
+    rateSource: text("rate_source").notNull(),
+    /** Seasonal percentage applied that day, or null when no seasonal pattern was on. */
+    seasonPct: integer("season_pct"),
+    outOfStockDays: integer("out_of_stock_days").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.skuId, t.day] }), index("forecast_daily_log_day_idx").on(t.day)],
+);
+
+/** Seasonal pattern on or off, per listing (Phase 7). A listing with no row is on. */
+export const seasonSettings = pgTable("season_settings", {
+  listingId: integer("listing_id")
+    .primaryKey()
+    .references(() => listings.id, { onDelete: "cascade" }),
+  enabled: boolean("enabled").notNull().default(true),
+  updatedBy: integer("updated_by").references(() => users.id, { onDelete: "set null" }),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/**
+ * Month percentages typed by hand per listing (Phase 7): how busy a calendar
+ * month is compared with a normal month (100). A typed month wins over the
+ * automatic pattern.
+ */
+export const seasonMonths = pgTable(
+  "season_months",
+  {
+    listingId: integer("listing_id")
+      .notNull()
+      .references(() => listings.id, { onDelete: "cascade" }),
+    month: integer("month").notNull(),
+    percent: integer("percent").notNull(),
+    updatedBy: integer("updated_by").references(() => users.id, { onDelete: "set null" }),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.listingId, t.month] }),
+    check("season_months_month_valid", sql`${t.month} between 1 and 12`),
+    check("season_months_percent_valid", sql`${t.percent} between 10 and 500`),
+  ],
+);

@@ -316,7 +316,7 @@ test("Overview shows dates per SKU, and expected daily sales can be entered by h
   // A SKU with no sales shows no dates and a note.
   const tote = page.getByTestId("forecast-row").filter({ hasText: "EX-TOTE-RED" });
   await expect(tote).toHaveAttribute("data-status", "none");
-  await expect(tote).toContainText("No sales in the last 30 days");
+  await expect(tote).toContainText("Out of stock for all of the last 30 days");
 
   // Enter 10 a day by hand. It has no FBA stock, so shipping is overdue.
   await tote.getByRole("link", { name: "EX-TOTE-RED" }).click();
@@ -465,4 +465,97 @@ test("admin plans a shipment; staff build it from the pallet sheets and mark it 
   // A sent shipment cannot be sent again.
   await staff.goto(sheetUrl + "/send");
   await expect(staff).toHaveURL(sheetUrl);
+});
+
+// Phase 7: forecast check. Uploads three months of made-up sales for three
+// totes, with EX-TOTE-NAT out of stock Oct 10-20.
+function phase7Ledger(): Buffer {
+  const head =
+    '"Date"\t"FNSKU"\t"ASIN"\t"MSKU"\t"Title"\t"Event Type"\t"Reference ID"\t"Quantity"\t"Fulfillment Center"\t"Disposition"\t"Reason"\t"Country"\t"Reconciled Quantity"\t"Unreconciled Quantity"\t"Date and Time"\t"Store"';
+  const rows: string[] = [head];
+  const row = (day: Date, msku: string, event: string, qty: number) => {
+    const iso = day.toISOString().slice(0, 10);
+    const [y, m, d] = iso.split("-");
+    rows.push(
+      `"${m}/${d}/${y}"\t"X000EXAMPL"\t"B000EXAMPL"\t"${msku}"\t"Example"\t"${event}"\t""\t"${qty}"\t"ABC1"\t"SELLABLE"\t""\t"US"\t""\t""\t"${iso}T00:00:00-0700"\t""`,
+    );
+  };
+  const natSold = (i: number) => 2 + (i % 4 === 0 ? 1 : 0);
+  let natSoldAfterRestock = 0;
+  for (let i = 81; i <= 91; i++) natSoldAfterRestock += natSold(i); // Oct 21-31
+  for (let t = Date.UTC(2026, 7, 1); t <= Date.UTC(2026, 9, 31); t += 86_400_000) {
+    const day = new Date(t);
+    const i = Math.round((t - Date.UTC(2026, 7, 1)) / 86_400_000);
+    const weekend = day.getUTCDay() === 0 || day.getUTCDay() === 6;
+    const iso = day.toISOString().slice(0, 10);
+    row(day, "EX-TOTE-BLK", "Shipments", -(3 + (weekend ? 2 : 0) + (i % 3 === 0 ? 1 : 0)));
+    if (iso < "2026-10-10" || iso > "2026-10-20") {
+      row(day, "EX-TOTE-NAT", "Shipments", -natSold(i));
+    }
+    if (iso === "2026-10-09") row(day, "EX-TOTE-NAT", "Adjustments", -60);
+    // Restocked so that Amazon holds 75 (70 available + 5 reserved) on Nov 1, as in the stock report.
+    if (iso === "2026-10-21") row(day, "EX-TOTE-NAT", "Receipts", 75 + natSoldAfterRestock);
+    row(day, "EX-TOTE-NVY", "Shipments", -(4 + (i % 5 === 0 ? 3 : 0) + (i > 60 ? 2 : 0)));
+  }
+  return Buffer.from(rows.join("\n"));
+}
+
+test("Forecast check: out-of-stock days left out, forecast vs actual, and a seasonal month typed by hand", async () => {
+  const page = admin;
+  await page.goto("/amazon");
+  await page.getByLabel("Amazon report files").setInputFiles({ name: "ledger-aug-oct.tsv", mimeType: "text/plain", buffer: phase7Ledger() });
+  await page.getByRole("button", { name: "Upload" }).click();
+  await expect(page.getByTestId("upload-ok")).toHaveCount(1);
+
+  await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Forecast check" }).click();
+  await expect(page).toHaveURL(/\/forecast-check$/);
+  await expect(page.getByTestId("history-range")).toHaveText("Aug 1, 2026 to Oct 31, 2026");
+  await expect(page.getByTestId("history-card")).toContainText("at least 12 months of history");
+  // No Amazon keys in tests, so the history button is off and the upload steps are shown.
+  await expect(page.getByTestId("load-history")).toBeDisabled();
+  await expect(page.getByTestId("accuracy-row")).toHaveCount(21);
+  const blkRow = page.getByTestId("accuracy-row").filter({ hasText: "EX-TOTE-BLK" });
+  await expect(blkRow).toContainText(/Good|Fair/);
+  if (SHOTS) await page.screenshot({ path: path.join(SHOTS, "7-forecast-check.png"), fullPage: true });
+
+  // NAT was out of stock 11 days in its 30-day window; those days are left out.
+  await page.goto("/overview");
+  const nat = page.getByTestId("forecast-row").filter({ hasText: "EX-TOTE-NAT" });
+  await expect(nat.getByTestId("rate-cell")).toContainText("out of stock");
+  await nat.getByRole("link", { name: "EX-TOTE-NAT" }).click();
+  await expect(page.getByTestId("calc-table")).toContainText("days in stock");
+  await expect(page.getByTestId("weeks-table")).toBeVisible();
+
+  // Type December at 200% for the totes: the plan now shows the seasonal step.
+  await page.goto("/forecast-check");
+  const form = page.getByTestId("season-listing").filter({ hasText: "Canvas Tote Bags" });
+  // Listings with no pattern start folded; open this one.
+  await form.locator("summary").click();
+  await form.getByLabel("December percentage").fill("abc");
+  await form.getByRole("button", { name: "Save pattern" }).click();
+  await expect(form.locator(".alert.error")).toContainText("December");
+  await form.getByLabel("December percentage").fill("200");
+  await form.getByRole("button", { name: "Save pattern" }).click();
+  await expect(form.getByText("Saved. The Overview dates now use this pattern.")).toBeVisible();
+  await page.reload();
+  await expect(page.getByTestId("season-listing").filter({ hasText: "Canvas Tote Bags" }).getByLabel("December percentage")).toHaveValue("200");
+  if (SHOTS) {
+    await page.getByTestId("season-card").scrollIntoViewIfNeeded();
+    await page.getByTestId("season-card").screenshot({ path: path.join(SHOTS, "8-seasonal-pattern.png") });
+  }
+
+  await page.goto("/overview");
+  await page.getByTestId("forecast-row").filter({ hasText: "EX-TOTE-NVY" }).getByRole("link", { name: "EX-TOTE-NVY" }).click();
+  await expect(page.getByTestId("calc-table")).toContainText("Seasonal pattern");
+  if (SHOTS) await page.screenshot({ path: path.join(SHOTS, "9-sku-forecast-detail.png"), fullPage: true });
+
+  // Switching the pattern off goes back to the plain 30-day plan.
+  await page.goto("/forecast-check");
+  const form2 = page.getByTestId("season-listing").filter({ hasText: "Canvas Tote Bags" });
+  await form2.getByLabel("Use a seasonal pattern for this listing").uncheck();
+  await form2.getByRole("button", { name: "Save pattern" }).click();
+  await expect(form2.getByText("Saved.")).toBeVisible();
+  await page.goto("/overview");
+  await page.getByTestId("forecast-row").filter({ hasText: "EX-TOTE-NVY" }).getByRole("link", { name: "EX-TOTE-NVY" }).click();
+  await expect(page.getByTestId("calc-table")).not.toContainText("Seasonal pattern");
 });

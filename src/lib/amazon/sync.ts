@@ -98,6 +98,81 @@ export function ledgerRange(now: Date): { startDay: string; endDay: string; star
 }
 
 /**
+ * Days of past sales asked for when the owner loads the sales history
+ * (Phase 7). Amazon keeps the Inventory Ledger for 18 months; 540 days stays
+ * just inside that.
+ */
+export const HISTORY_DAYS = 540;
+
+/** Whole days from HISTORY_DAYS days ago up to the end of yesterday. */
+export function historyRange(now: Date): { startDay: string; endDay: string; start: Date; end: Date } {
+  const today = businessToday(now);
+  const startDay = addDays(today, -HISTORY_DAYS);
+  const endDay = addDays(today, -1);
+  return {
+    startDay,
+    endDay,
+    start: startOfBusinessDay(startDay),
+    end: new Date(startOfBusinessDay(today).getTime() - 1000),
+  };
+}
+
+export type HistoryRequestOutcome =
+  | { status: "requested" }
+  | { status: "busy" }
+  | { status: "failed"; message: string };
+
+/**
+ * Asks Amazon for up to 18 months of the Inventory Ledger in one report. It is
+ * then checked and saved like the daily one (by the next run, the Refresh
+ * button, or the caller polling with syncAmazon({ request: false })).
+ * "busy" means another Inventory Ledger report is still being prepared.
+ */
+export async function requestLedgerHistory(
+  db: Db,
+  client: ReportsClient,
+  opts: { userId?: number | null; now?: Date } = {},
+): Promise<HistoryRequestOutcome> {
+  const now = opts.now ?? new Date();
+  await expireStale(db, now);
+  const range = historyRange(now);
+  const [row] = await db
+    .insert(amazonSyncRequests)
+    .values({
+      kind: "ledger_detail",
+      reportType: REPORT_TYPES.ledger_detail,
+      trigger: "history",
+      requestedBy: opts.userId ?? null,
+      requestedAt: now,
+      dataStart: range.start,
+      dataEnd: range.end,
+    })
+    .onConflictDoNothing()
+    .returning({ id: amazonSyncRequests.id });
+  if (!row) return { status: "busy" };
+  try {
+    const reportId = await client.createReport(REPORT_TYPES.ledger_detail, { start: range.start, end: range.end });
+    await db.update(amazonSyncRequests).set({ amazonReportId: reportId }).where(eq(amazonSyncRequests.id, row.id));
+    return { status: "requested" };
+  } catch (err) {
+    const message = errorText(err);
+    await finish(db, row.id, "failed", { message });
+    return { status: "failed", message };
+  }
+}
+
+/** The newest history request, for the forecast check page. */
+export async function latestHistoryRequest(db: Db) {
+  const [row] = await db
+    .select()
+    .from(amazonSyncRequests)
+    .where(eq(amazonSyncRequests.trigger, "history"))
+    .orderBy(desc(amazonSyncRequests.requestedAt), desc(amazonSyncRequests.id))
+    .limit(1);
+  return row ?? null;
+}
+
+/**
  * Keeps only whole days inside the range asked for, so a part day at either
  * end never replaces a full day saved earlier. The saved period starts on the
  * first day asked for (so days with no sales are cleared too) and ends on the
