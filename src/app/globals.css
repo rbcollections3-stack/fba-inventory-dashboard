@@ -175,3 +175,13 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
 .badge.ok { background: var(--ok-bg); color: var(--ok); }
 .badge.warn { background: var(--warn-bg); color: var(--warn); }
 .badge.off { background: var(--danger-bg); color: var(--danger); }
+
+ol.steps { margin: 0 0 12px; padding-left: 20px; display: grid; gap: 6px; }
+.subtle { color: var(--muted); font-size: 0.8rem; display: block; }
+.inhouse-sm { font-size: 1.15rem; font-weight: 700; }
+.count-input { width: 96px !important; font-size: 1.1rem !important; text-align: right; }
+.count-table td { vertical-align: middle; }
+tr.row-error td { background: var(--danger-bg); }
+.error-text { color: var(--danger); }
+.subtle-error { display: block; font-size: 0.8rem; white-space: normal; }
+button.big { padding: 12px 22px; font-size: 1.05rem; }

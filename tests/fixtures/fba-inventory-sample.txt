@@ -1,0 +1,5 @@
+sku	fnsku	asin	product-name	condition	your-price	mfn-listing-exists	mfn-fulfillable-quantity	afn-listing-exists	afn-warehouse-quantity	afn-fulfillable-quantity	afn-unsellable-quantity	afn-reserved-quantity	afn-total-quantity	per-unit-volume	afn-inbound-working-quantity	afn-inbound-shipped-quantity	afn-inbound-receiving-quantity	afn-researching-quantity	afn-reserved-future-supply	afn-future-supply-buyable
+EX-TOTE-BLK	X000EXAMP1	B000EXAMP1	Example tote black	New	19.99	No		Yes	260	240	2	18	380	0.5	24	96	0	0	0	0
+EX-TOTE-NAT	X000EXAMP2	B000EXAMP2	Example tote natural	New	19.99	No		Yes	75	70	0	5	75	0.5	0	0	0	0	0	0
+amzn.gr.example-used-1	X000EXAMP3	B000EXAMP1	Example tote black	UsedLikeNew	15.99	No		Yes	3	3	0	0	3	0.5	0	0	0	0	0	0
+OTHER-PRODUCT	X000EXAMP4	B000EXAMP4	Something else	New	9.99	No		Yes	50	50	0	0	50	0.5	0	0	0	0	0	0

@@ -1,5 +1,6 @@
 "use server";
 
+import { businessToday } from "@/lib/dates";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getDb } from "@/db";
@@ -56,7 +57,7 @@ export async function saveSkuAction(
   if (countUnits !== null) {
     await recordCount(getDb(), result.id, countUnits, {
       userId: user.id,
-      countedOn: new Date().toISOString().slice(0, 10),
+      countedOn: businessToday(),
     });
     revalidatePath("/warehouse");
   }
@@ -131,7 +132,7 @@ export async function confirmImportAction(rowsJson: string): Promise<ImportState
   if (check.errors.length > 0) {
     return { stage: "problems", fileName: "", errors: check.errors, warnings: check.warnings };
   }
-  const today = new Date().toISOString().slice(0, 10);
+  const today = businessToday();
   const result = await importSkus(getDb(), check.rows, { userId: user.id, today });
   if (!result.ok) return { stage: "problems", fileName: "", errors: result.errors, warnings: [] };
   revalidatePath("/skus");

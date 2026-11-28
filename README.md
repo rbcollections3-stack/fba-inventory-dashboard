@@ -4,12 +4,16 @@ A private web dashboard for tracking Amazon FBA inventory and planning when to
 ship to Amazon and when to reorder from China. It is built in phases; see the
 build plan for the full picture.
 
-**Phase 1 (this version):** logins, the SKU setup screen, and import of the
-SKU spreadsheet.
+**Phase 1:** logins, the SKU setup screen, and import of the SKU spreadsheet.
 
-- **Admin login** sees everything: SKU setup, spreadsheet import, the
-  warehouse screen and the Accounts screen.
-- **Warehouse staff logins**, one per person, see only the Warehouse screen.
+**Phase 2 (this version):** Amazon data in. Upload Seller Central reports to
+see FBA available, FBA reserved, units inbound to FBA and units sold in the
+last 30 days for every SKU, and enter warehouse stock counts.
+
+- **Admin login** sees everything: SKU setup, spreadsheet import, Amazon
+  reports, the warehouse screens and the Accounts screen.
+- **Warehouse staff logins**, one per person, see only the Warehouse and
+  Stock counts screens.
 
 Login security:
 
@@ -39,6 +43,39 @@ Required columns: Listing, Amazon SKU, In-house SKU, Units per case,
 Tie (cases per layer), High (layers), Max cases per pallet. Optional:
 Warehouse on hand (units), Product description, Warehouse location, ASIN,
 Count date, Notes.
+
+## Amazon reports
+
+Upload on **Amazon reports**. The app recognises each file from its columns:
+
+| Report (Seller Central > Reports > Fulfillment) | SP-API report type | Gives |
+| --- | --- | --- |
+| Manage FBA Inventory (.txt) | `GET_FBA_MYI_UNSUPPRESSED_INVENTORY_DATA` | FBA available (fulfillable), reserved, unsellable, inbound working / shipped / receiving |
+| Inventory Ledger, Detailed view (.tsv or .csv) | `GET_LEDGER_DETAIL_VIEW_DATA` | Daily events per SKU; `Shipments` are units sold |
+
+- Only SKUs in the SKU list are used. Other SKUs and Amazon's `amzn.gr.*`
+  resale SKUs are counted as skipped, never as errors.
+- "Inbound to FBA" is working + shipped + receiving, matching Seller Central.
+- Ledger rows are summed per SKU, day, event type and disposition across
+  fulfillment centers. Uploading days already loaded replaces them, so sales
+  are never counted twice.
+- Each inventory upload is kept as a snapshot; the newest one is shown.
+- The browser gzips files before upload, so a month of ledger fits easily.
+
+`saveAmazonReport()` in `src/lib/amazon/repo.ts` is the single entry point
+for both hand uploads and the Phase 3 SP-API pull (`source: "sp_api"`, with
+`asOf` set to the report's data end time). Parsing lives in
+`src/lib/amazon/parse.ts` and has no database dependencies.
+
+Real Seller Central reports must only ever be uploaded into the running app,
+never committed here. Test fixtures in `tests/fixtures/` are made up.
+
+## Stock counts
+
+**Warehouse > Enter stock counts** (`/warehouse/counts`) lets staff type full
+cases and loose units per in-house SKU; the app works out the units. A second
+count for the same SKU on the same day replaces the first. "Today" uses
+`BUSINESS_TIME_ZONE` (default `America/Los_Angeles`).
 
 ## For developers
 
