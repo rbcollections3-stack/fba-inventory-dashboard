@@ -23,7 +23,7 @@ export type ReportType = (typeof REPORT_TYPES)[SyncKind];
 const ALLOWED_REPORT_TYPES = new Set<string>(Object.values(REPORT_TYPES));
 
 /** Amazon.com (United States). */
-export const US_MARKETPLACE_ID = "ATVPDKIKX0DOER";
+export const US_MARKETPLACE_ID = "ATVPDKIKX0DER";
 
 const ENDPOINTS = {
   na: "https://sellingpartnerapi-na.amazon.com",

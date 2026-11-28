@@ -32,6 +32,8 @@ describe("Amazon settings", () => {
   it("defaults to the US marketplace and North America endpoint", () => {
     const c = spApiConfigFromEnv(env)!;
     expect(c.marketplaceId).toBe(US_MARKETPLACE_ID);
+    // Amazon's published id for Amazon.com (US). Typed out so a typo can't hide behind the constant.
+    expect(US_MARKETPLACE_ID).toBe("ATVPDKIKX0DER");
     expect(c.endpoint).toBe("https://sellingpartnerapi-na.amazon.com");
   });
 });

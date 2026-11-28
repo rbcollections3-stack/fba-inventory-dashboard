@@ -152,7 +152,7 @@ The common ones:
   app again to get a new Refresh Token and put that in Vercel.
 
 **Canada and other marketplaces.** The app reads Amazon.com (US) only for now.
-Optional settings `SP_API_MARKETPLACE_ID` (default `ATVPDKIKX0DOER`, US) and
+Optional settings `SP_API_MARKETPLACE_ID` (default `ATVPDKIKX0DER`, US) and
 `SP_API_REGION` (default `na`) exist so another marketplace can be added
 later without a rewrite.
 
