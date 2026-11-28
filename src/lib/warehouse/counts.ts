@@ -96,7 +96,8 @@ export type CountHistoryRow = {
   skuId: number;
   units: number;
   countedOn: string;
-  source: "import" | "manual";
+  source: "import" | "manual" | "shipment";
+  shipmentId: number | null;
   by: string | null;
   at: Date;
 };
@@ -110,6 +111,7 @@ export async function recentCounts(db: Db, limit = 40): Promise<CountHistoryRow[
       units: warehouseCounts.units,
       countedOn: warehouseCounts.countedOn,
       source: warehouseCounts.source,
+      shipmentId: warehouseCounts.shipmentId,
       by: users.username,
       at: warehouseCounts.createdAt,
     })

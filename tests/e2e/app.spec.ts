@@ -131,9 +131,9 @@ test("warehouse staff only see the warehouse screen", async ({ browser }) => {
   await fullLogin(page, "warehouse", STAFF_FIRST, STAFF_PW);
   await expect(page).toHaveURL(/\/warehouse$/);
   await expect(page.getByTestId("wh-card")).toHaveCount(21);
-  await expect(page.getByRole("navigation", { name: "Main" }).getByRole("link")).toHaveText(["Warehouse", "Stock counts"]);
+  await expect(page.getByRole("navigation", { name: "Main" }).getByRole("link")).toHaveText(["Warehouse", "Pallet sheets", "Stock counts"]);
 
-  for (const p of ["/overview", "/overview/1", "/skus", "/skus/import", "/skus/1", "/accounts", "/amazon", "/"]) {
+  for (const p of ["/overview", "/overview/1", "/shipments", "/skus", "/skus/import", "/skus/1", "/accounts", "/amazon", "/"]) {
     await page.goto(p);
     await expect(page).toHaveURL(/\/warehouse$/);
   }
@@ -342,4 +342,96 @@ test("Overview shows dates per SKU, and expected daily sales can be entered by h
   await expect(page.getByText("Cleared. The dates now use real Amazon sales.")).toBeVisible();
   await page.goto("/overview?view=listing");
   await expect(page.getByTestId("forecast-row").filter({ hasText: "EX-TOTE-RED" })).toHaveAttribute("data-status", "none");
+});
+
+// Phase 5: ship to Amazon and pallet build sheets. X001 (EX-TOTE-BLK) packs
+// 12 per case, tie 7 (edited above), high 5, max 40, so 35 cases per pallet.
+// Staff counted 123 units of it above.
+const SHOTS = process.env.E2E_SCREENSHOTS ? path.join(ROOT, "test-results", "screens") : null;
+
+test("admin plans a shipment; staff build it from the pallet sheets and mark it sent", async ({ browser }) => {
+  const page = admin;
+  await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Ship to Amazon" }).click();
+  await expect(page).toHaveURL(/\/shipments$/);
+  await expect(page.getByTestId("plan-row")).toHaveCount(21);
+
+  // Start from a clean slate, then send 40 cases of X001.
+  for (const box of await page.getByRole("checkbox", { checked: true }).all()) await box.uncheck();
+  const row = page.getByTestId("plan-row").filter({ hasText: "X001" });
+  await expect(row).toContainText("10"); // 123 units = 10 full cases on the shelf
+  await page.getByLabel("Cases of X001").fill("40");
+  await expect(page.getByLabel("Include X001")).toBeChecked();
+  await expect(row.getByTestId("plan-pallets")).toContainText("2");
+  await expect(row.getByTestId("plan-pallets")).toContainText("35 + 5 cases");
+  await expect(row).toContainText("More than the 10 full cases last counted.");
+  await page.getByLabel("Note for the warehouse (optional)").fill("Pickup Tuesday 10 AM");
+  if (SHOTS) await page.screenshot({ path: path.join(SHOTS, "1-plan-shipment.png"), fullPage: true });
+  await page.getByRole("button", { name: "Create shipment and pallet sheets" }).click();
+
+  await expect(page).toHaveURL(/\/warehouse\/shipments\/\d+\?new=1$/);
+  await expect(page.getByTestId("shipment-status")).toHaveText("To build");
+  await expect(page.getByTestId("pallet-sheet")).toHaveCount(2);
+  const first = page.getByTestId("pallet-sheet").first();
+  await expect(first).toContainText("Pallet 1 of 2");
+  await expect(first.getByTestId("sheet-inhouse")).toHaveText("X001");
+  await expect(first).toContainText("Amazon SKU: EX-TOTE-BLK");
+  await expect(first.getByTestId("sheet-cases")).toHaveText("35");
+  await expect(first).toContainText("Stack 4 more layers of 7 cases on top");
+  const second = page.getByTestId("pallet-sheet").nth(1);
+  await expect(second.getByTestId("sheet-cases")).toHaveText("5");
+  await expect(second).toContainText("Put all 5 cases flat on the pallet");
+  await page.getByLabel("Amazon shipment ID (optional, for reference)").fill("FBA15EXAMPLE");
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(page.getByTestId("pallet-sheet").first()).toContainText("Amazon FBA15EXAMPLE");
+  const sheetUrl = page.url().replace(/\?.*$/, "");
+
+  // Planning again shows X001 is already in a shipment and leaves it unticked.
+  await page.goto("/shipments");
+  await expect(page.getByTestId("plan-row").filter({ hasText: "X001" })).toContainText("Already in shipment #");
+  await expect(page.getByLabel("Include X001")).not.toBeChecked();
+
+  // Warehouse staff see it and build from the sheets.
+  const staff = await newPage(browser);
+  await fullLogin(staff, "warehouse", "Brand-new-staff-5%");
+  await expect(staff).toHaveURL(/\/warehouse$/);
+  await expect(staff.getByTestId("shipment-row")).toHaveCount(1);
+  await expect(staff.getByTestId("shipment-row")).toContainText("X001 x 40");
+  await staff.getByTestId("shipment-row").getByRole("link").first().click();
+  await expect(staff.getByTestId("pallet-sheet")).toHaveCount(2);
+  await expect(staff.getByText("Note: Pickup Tuesday 10 AM")).toBeVisible();
+  // Staff cannot cancel or edit the Amazon ID.
+  await expect(staff.getByRole("button", { name: "Cancel this shipment" })).toHaveCount(0);
+  if (SHOTS) {
+    await staff.setViewportSize({ width: 1024, height: 1366 }); // a tablet held upright
+    await staff.screenshot({ path: path.join(SHOTS, "2-pallet-sheets-tablet.png"), fullPage: true });
+    await staff.emulateMedia({ media: "print" });
+    await staff.pdf({ path: path.join(SHOTS, "3-pallet-sheets-printed.pdf"), format: "Letter", printBackground: true });
+    await staff.emulateMedia({ media: "screen" });
+  }
+
+  // Mark it sent: 480 units left, so the shelf should now be empty.
+  await staff.getByTestId("mark-sent-link").click();
+  await expect(staff).toHaveURL(/\/send$/);
+  await expect(staff.getByLabel("Full cases of X001 left")).toHaveValue("0");
+  await staff.getByLabel("Full cases of X001 left").fill("");
+  await staff.getByTestId("confirm-sent").click();
+  await expect(staff.locator(".alert.error")).toContainText("Every SKU in the shipment needs a count");
+  await staff.getByLabel("Full cases of X001 left").fill("0");
+  await staff.getByLabel("Loose units of X001 left").fill("3");
+  if (SHOTS) await staff.screenshot({ path: path.join(SHOTS, "4-mark-sent.png"), fullPage: true });
+  await staff.getByTestId("confirm-sent").click();
+  await expect(staff.getByTestId("sent-confirmation")).toBeVisible();
+  await expect(staff.getByTestId("shipment-status")).toHaveText("Sent");
+  await expect(staff.getByTestId("mark-sent-link")).toHaveCount(0);
+
+  // The count is saved, and the units count as on the way to Amazon.
+  await staff.goto("/warehouse/counts");
+  await expect(staff.getByTestId("count-row").filter({ hasText: "X001" })).toContainText("3");
+  await expect(staff.getByText(/after shipment #\d+ left/)).toBeVisible();
+  await page.goto("/overview");
+  await expect(page.getByTestId("forecast-row").filter({ hasText: "EX-TOTE-BLK" })).toContainText("incl. 480 just sent");
+
+  // A sent shipment cannot be sent again.
+  await staff.goto(sheetUrl + "/send");
+  await expect(staff).toHaveURL(sheetUrl);
 });

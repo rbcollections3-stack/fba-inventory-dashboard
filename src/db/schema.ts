@@ -1,4 +1,5 @@
 import {
+  type AnyPgColumn,
   boolean,
   check,
   date,
@@ -93,7 +94,8 @@ export const skus = pgTable(
   ],
 );
 
-export const countSourceEnum = pgEnum("count_source", ["import", "manual"]);
+/** import: SKU spreadsheet. manual: Stock counts screen. shipment: counted after an Amazon shipment left (Phase 5). */
+export const countSourceEnum = pgEnum("count_source", ["import", "manual", "shipment"]);
 
 /**
  * Warehouse on-hand counts, one row per count. The latest row per SKU is the
@@ -112,6 +114,8 @@ export const warehouseCounts = pgTable(
     source: countSourceEnum("source").notNull(),
     createdBy: integer("created_by").references(() => users.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    /** Set when the count was taken as an Amazon shipment left (Phase 5). */
+    shipmentId: integer("shipment_id").references((): AnyPgColumn => shipments.id, { onDelete: "set null" }),
   },
   (t) => [
     index("warehouse_counts_sku_idx").on(t.skuId, t.createdAt),
@@ -269,3 +273,65 @@ export const forecastSettings = pgTable(
   },
   (t) => [check("forecast_settings_manual_positive", sql`${t.manualDailySales} is null or ${t.manualDailySales} > 0`)],
 );
+
+/**
+ * Shipments to Amazon (Phase 5). The admin requests a shipment; warehouse
+ * staff build the pallets from the sheets and mark it sent, confirming what
+ * is left on the shelf. The app never creates anything in Seller Central.
+ * status: requested (waiting to be built and sent), sent, cancelled.
+ */
+export const shipments = pgTable(
+  "shipments",
+  {
+    id: serial("id").primaryKey(),
+    status: text("status").notNull().default("requested"),
+    /** Amazon's shipment ID from Seller Central (for example FBA15XXXXXXX), typed in for reference. */
+    amazonShipmentId: text("amazon_shipment_id"),
+    note: text("note"),
+    createdBy: integer("created_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    sentAt: timestamp("sent_at", { withTimezone: true }),
+    sentBy: integer("sent_by").references(() => users.id, { onDelete: "set null" }),
+    cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
+    cancelledBy: integer("cancelled_by").references(() => users.id, { onDelete: "set null" }),
+  },
+  (t) => [
+    index("shipments_status_idx").on(t.status, t.createdAt),
+    check("shipments_status_valid", sql`${t.status} in ('requested', 'sent', 'cancelled')`),
+  ],
+);
+
+/**
+ * One row per SKU in a shipment. The packing figures are copied from the SKU
+ * when the shipment is requested, so a later SKU edit does not change pallet
+ * sheets that are already printed.
+ */
+export const shipmentLines = pgTable(
+  "shipment_lines",
+  {
+    id: serial("id").primaryKey(),
+    shipmentId: integer("shipment_id")
+      .notNull()
+      .references(() => shipments.id, { onDelete: "cascade" }),
+    skuId: integer("sku_id")
+      .notNull()
+      .references(() => skus.id, { onDelete: "cascade" }),
+    cases: integer("cases").notNull(),
+    unitsPerCase: integer("units_per_case").notNull(),
+    tie: integer("tie").notNull(),
+    high: integer("high").notNull(),
+    maxCasesPerPallet: integer("max_cases_per_pallet").notNull(),
+  },
+  (t) => [
+    uniqueIndex("shipment_lines_sku_key").on(t.shipmentId, t.skuId),
+    index("shipment_lines_sku_idx").on(t.skuId),
+    check("shipment_lines_cases_positive", sql`${t.cases} > 0`),
+    check("shipment_lines_units_per_case_positive", sql`${t.unitsPerCase} > 0`),
+    check("shipment_lines_tie_positive", sql`${t.tie} > 0`),
+    check("shipment_lines_high_positive", sql`${t.high} > 0`),
+    check("shipment_lines_max_cases_positive", sql`${t.maxCasesPerPallet} > 0`),
+  ],
+);
+
+export type Shipment = typeof shipments.$inferSelect;
+export type ShipmentStatus = "requested" | "sent" | "cancelled";

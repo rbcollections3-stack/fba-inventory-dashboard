@@ -1,31 +1,46 @@
 import Link from "next/link";
 import { getDb } from "@/db";
 import { requireUser } from "@/lib/auth/session";
+import { listShipments } from "@/lib/shipments/repo";
 import { groupByListing, listSkus } from "@/lib/skus/repo";
+import { ShipmentList } from "./shipments/shipment-list";
 
 export const metadata = { title: "Warehouse · RB Collections FBA Dashboard" };
 
 export default async function WarehousePage() {
   await requireUser();
-  const groups = groupByListing(await listSkus(getDb()));
+  const db = getDb();
+  const [all, toBuild] = await Promise.all([listSkus(db), listShipments(db, "requested")]);
+  const groups = groupByListing(all);
   return (
     <>
       <div className="page-head">
         <div>
           <h1>Warehouse</h1>
-          <p className="muted">
-            How each product is packed and stacked. Pallet build sheets for requested shipments will appear on
-            this screen in a later update.
-          </p>
+          <p className="muted">Shipments to build, and how each product is packed and stacked.</p>
         </div>
-        <Link className="button primary" href="/warehouse/counts">
-          Enter stock counts
-        </Link>
+        <div className="actions">
+          <Link className="button" href="/warehouse/shipments">
+            All shipments
+          </Link>
+          <Link className="button primary" href="/warehouse/counts">
+            Enter stock counts
+          </Link>
+        </div>
       </div>
+      <h2>Shipments to build</h2>
+      {toBuild.length === 0 ? (
+        <div className="card muted" data-testid="no-shipments">
+          Nothing to build right now.
+        </div>
+      ) : (
+        <ShipmentList shipments={toBuild} />
+      )}
+      <h2>How each product is packed</h2>
       {groups.length === 0 && <div className="card">No SKUs have been set up yet.</div>}
       {groups.map((g) => (
         <section key={g.listing}>
-          <h2>{g.listing}</h2>
+          <h3>{g.listing}</h3>
           <div className="wh-grid">
             {g.skus.map((s) => (
               <div className="wh-card" key={s.id} data-testid="wh-card">
