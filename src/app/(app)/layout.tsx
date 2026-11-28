@@ -1,42 +1,34 @@
-import Link from "next/link";
+import { LogOut } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
 import { logout } from "../login/actions";
+import { SideNav } from "./side-nav";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await requireUser();
   const isAdmin = user.role === "admin";
   return (
-    <>
-      <header className="topbar">
-        <div className="topbar-inner">
-          <Link href="/" className="brand">
-            RB Collections
-          </Link>
-          <nav className="nav" aria-label="Main">
-            {isAdmin && <Link href="/overview">Overview</Link>}
-            {isAdmin && <Link href="/shipments">Ship to Amazon</Link>}
-            {isAdmin && <Link href="/china">China orders</Link>}
-            {isAdmin && <Link href="/skus">SKUs</Link>}
-            {isAdmin && <Link href="/skus/import">Import spreadsheet</Link>}
-            {isAdmin && <Link href="/amazon">Amazon reports</Link>}
-            <Link href="/warehouse">Warehouse</Link>
-            <Link href="/warehouse/shipments">Pallet sheets</Link>
-            <Link href="/warehouse/labels">Barcode labels</Link>
-            <Link href="/warehouse/receiving">Receiving</Link>
-            <Link href="/warehouse/counts">Stock counts</Link>
-            {isAdmin && <Link href="/accounts">Accounts</Link>}
-          </nav>
+    <div className="shell">
+      <SideNav
+        isAdmin={isAdmin}
+        footer={
           <div className="who">
-            <span className="muted small">
-              {user.username} ({isAdmin ? "admin" : "warehouse staff"})
+            <span className="avatar" aria-hidden="true">
+              {user.username.slice(0, 1).toUpperCase()}
+            </span>
+            <span className="who-text">
+              <span className="who-name">{user.username}</span>
+              <span className="who-role">{isAdmin ? "admin" : "warehouse staff"}</span>
             </span>
             <form action={logout}>
-              <button type="submit">Log out</button>
+              <button type="submit" className="logout" title="Log out">
+                <LogOut size={16} aria-hidden="true" />
+                Log out
+              </button>
             </form>
           </div>
-        </div>
-      </header>
+        }
+      />
       <main className="page">{children}</main>
-    </>
+    </div>
   );
 }
