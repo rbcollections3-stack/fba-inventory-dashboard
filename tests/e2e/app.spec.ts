@@ -131,7 +131,7 @@ test("warehouse staff only see the warehouse screen", async ({ browser }) => {
   await fullLogin(page, "warehouse", STAFF_FIRST, STAFF_PW);
   await expect(page).toHaveURL(/\/warehouse$/);
   await expect(page.getByTestId("wh-card")).toHaveCount(21);
-  await expect(page.getByRole("navigation", { name: "Main" }).getByRole("link")).toHaveText(["Warehouse", "Pallet sheets", "Stock counts"]);
+  await expect(page.getByRole("navigation", { name: "Main" }).getByRole("link")).toHaveText(["Warehouse", "Pallet sheets", "Barcode labels", "Stock counts"]);
 
   for (const p of ["/overview", "/overview/1", "/shipments", "/skus", "/skus/import", "/skus/1", "/accounts", "/amazon", "/"]) {
     await page.goto(p);
@@ -380,7 +380,10 @@ test("admin plans a shipment; staff build it from the pallet sheets and mark it 
   const second = page.getByTestId("pallet-sheet").nth(1);
   await expect(second.getByTestId("sheet-cases")).toHaveText("5");
   await expect(second).toContainText("Put all 5 cases flat on the pallet");
-  await page.getByLabel("Amazon shipment ID (optional, for reference)").fill("FBA15EXAMPLE");
+  await page.getByLabel("Amazon shipment ID (needed to print Amazon labels)").fill("not-an-id");
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(page.locator(".alert.error")).toContainText("Amazon shipment IDs start with FBA");
+  await page.getByLabel("Amazon shipment ID (needed to print Amazon labels)").fill("fba15example");
   await page.getByRole("button", { name: "Save", exact: true }).click();
   await expect(page.getByTestId("pallet-sheet").first()).toContainText("Amazon FBA15EXAMPLE");
   const sheetUrl = page.url().replace(/\?.*$/, "");
@@ -408,6 +411,34 @@ test("admin plans a shipment; staff build it from the pallet sheets and mark it 
     await staff.pdf({ path: path.join(SHOTS, "3-pallet-sheets-printed.pdf"), format: "Letter", printBackground: true });
     await staff.emulateMedia({ media: "screen" });
   }
+
+  // Barcode stickers: the FNSKU came from the Amazon report uploaded earlier.
+  await staff.getByRole("link", { name: "Barcode stickers for 480 units" }).click();
+  await expect(staff.getByRole("heading", { level: 1 })).toHaveText("480 barcode labels for X001");
+  await expect(staff.getByTestId("fnsku-labels")).toHaveAttribute("data-count", "480");
+  await expect(staff.locator(".fnsku-preview")).toContainText("X000EXAMP1");
+  if (SHOTS) {
+    await staff.setViewportSize({ width: 1280, height: 900 });
+    await staff.screenshot({ path: path.join(SHOTS, "6-barcode-print.png"), fullPage: true });
+    await staff.goto(staff.url().replace("qty=480", "qty=3"));
+    await staff.emulateMedia({ media: "print" });
+    await staff.pdf({ path: path.join(SHOTS, "7-barcode-labels-2.25x1.25.pdf"), preferCSSPageSize: true, printBackground: true });
+    await staff.emulateMedia({ media: "screen" });
+  }
+  await staff.goto("/warehouse/labels");
+  await expect(staff.getByTestId("label-row").filter({ hasText: "X001" })).toContainText("X000EXAMP1");
+  if (SHOTS) await staff.screenshot({ path: path.join(SHOTS, "5-barcode-labels.png"), fullPage: true });
+  await staff.goto("/warehouse/labels/print?sku=1&qty=0");
+  await expect(staff.locator(".alert.error")).toContainText("Type how many labels you need");
+
+  // Amazon labels need the Amazon connection, which the test site does not have.
+  await staff.goto(sheetUrl + "/labels");
+  await expect(staff.getByText("The app is not connected to Amazon")).toBeVisible();
+  const noKeys = await staff.request.get(sheetUrl + "/labels/pdf?ship=FBA15EXAMPLE&kind=pallet&pallets=2");
+  expect(noKeys.status()).toBe(503);
+  const otherShip = await staff.request.get(sheetUrl + "/labels/pdf?ship=FBA15OTHER00&kind=pallet&pallets=2");
+  expect(otherShip.status()).toBe(400);
+  await staff.goto(sheetUrl);
 
   // Mark it sent: 480 units left, so the shelf should now be empty.
   await staff.getByTestId("mark-sent-link").click();

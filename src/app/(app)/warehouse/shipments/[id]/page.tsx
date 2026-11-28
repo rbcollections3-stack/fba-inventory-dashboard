@@ -45,6 +45,11 @@ export default async function ShipmentSheetsPage({ params, searchParams }: PageP
           <Link className="button" href={isAdmin ? "/shipments" : "/warehouse/shipments"}>
             Back
           </Link>
+          {s.status !== "cancelled" && (
+            <Link className="button" href={`/warehouse/shipments/${s.id}/labels`} data-testid="amazon-labels-link">
+              Amazon box and pallet labels
+            </Link>
+          )}
           {s.status !== "cancelled" && <PrintButton />}
           {open && (
             <Link className="button primary" href={`/warehouse/shipments/${s.id}/send`} data-testid="mark-sent-link">
@@ -70,20 +75,29 @@ export default async function ShipmentSheetsPage({ params, searchParams }: PageP
         <div className="alert error no-print">This shipment was cancelled. Do not build it.</div>
       )}
       {s.note && <div className="alert warn">Note: {s.note}</div>}
+      {q.idError && (
+        <div className="alert error no-print" role="alert">
+          That Amazon shipment ID was not saved. Amazon shipment IDs start with FBA, such as FBA15K2LMN3P. Type more
+          than one with commas between them.
+        </div>
+      )}
 
       {isAdmin && s.status !== "cancelled" && (
         <div className="card no-print admin-tools">
           <form action={saveAmazonIdAction.bind(null, s.id)} className="inline-form">
-            <label htmlFor="amazonShipmentId">Amazon shipment ID (optional, for reference)</label>
+            <label htmlFor="amazonShipmentId">Amazon shipment ID (needed to print Amazon labels)</label>
             <input
               id="amazonShipmentId"
               name="amazonShipmentId"
               type="text"
-              maxLength={40}
+              maxLength={400}
               defaultValue={s.amazonShipmentId ?? ""}
               placeholder="FBA..."
             />
             <button type="submit">Save</button>
+            <span className="hint muted small">
+              From Seller Central after you create the shipment. If Amazon split it, type every ID with commas between.
+            </span>
           </form>
           {open && (
             <form action={cancelShipmentAction.bind(null, s.id)}>
@@ -114,6 +128,14 @@ export default async function ShipmentSheetsPage({ params, searchParams }: PageP
             <strong>Never mix products on a pallet.</strong> Each pallet holds one in-house SKU only.
           </li>
           <li>Find products by the big in-house SKU. That is the label on the shelf and on the cases.</li>
+          <li>
+            If the units have <strong>no Amazon barcode sticker</strong> (starts with X00), print stickers with the link
+            under the SKU and put one on every unit before packing.
+          </li>
+          <li>
+            Print the <strong>Amazon box and pallet labels</strong> (button at the top) on the Rollo with 4x6 labels.
+            They come sorted by pallet.
+          </li>
           <li>When a pallet is done, sign its sheet and keep it with the pallet.</li>
           <li>When every pallet is built and has left, press Mark as sent and count what is left on the shelf.</li>
         </ol>
@@ -132,6 +154,14 @@ export default async function ShipmentSheetsPage({ params, searchParams }: PageP
                 <td>
                   <div className="inhouse-sm">{line.inhouseSku}</div>
                   <span className="subtle">Amazon SKU: {line.amazonSku}</span>
+                  {line.fnsku && open && (
+                    <Link
+                      className="no-print small"
+                      href={`/warehouse/labels/print?sku=${line.skuId}&qty=${line.units}&back=/warehouse/shipments/${s.id}`}
+                    >
+                      Barcode stickers for {n(line.units)} units
+                    </Link>
+                  )}
                 </td>
                 <td className="num">
                   <strong>{n(line.cases)}</strong>

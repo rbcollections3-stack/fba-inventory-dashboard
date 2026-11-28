@@ -5,6 +5,7 @@ import {
   date,
   index,
   integer,
+  jsonb,
   numeric,
   pgEnum,
   pgTable,
@@ -81,6 +82,8 @@ export const skus = pgTable(
     description: text("description"),
     warehouseLocation: text("warehouse_location"),
     asin: text("asin"),
+    /** Amazon's barcode for this SKU (X00... or the ASIN for stickerless items), copied from Amazon reports. */
+    fnsku: text("fnsku"),
     notes: text("notes"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
@@ -287,6 +290,8 @@ export const shipments = pgTable(
     status: text("status").notNull().default("requested"),
     /** Amazon's shipment ID from Seller Central (for example FBA15XXXXXXX), typed in for reference. */
     amazonShipmentId: text("amazon_shipment_id"),
+    /** Where each Amazon shipment ID was found in Amazon's inbound plans, so labels load faster next time. */
+    amazonLookup: jsonb("amazon_lookup").$type<Record<string, { inboundPlanId: string; shipmentId: string }>>(),
     note: text("note"),
     createdBy: integer("created_by").references(() => users.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

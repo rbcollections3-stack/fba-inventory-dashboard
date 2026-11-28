@@ -15,6 +15,7 @@ export type SkuFormDefaults = {
   description: string;
   warehouseLocation: string;
   asin: string;
+  fnsku: string;
   notes: string;
 };
 
@@ -76,6 +77,9 @@ export function SkuForm({
         {field("warehouseLocation", "Warehouse location", { hint: "Optional." })}
         {field("asin", "ASIN", { hint: "Optional. 10 letters and numbers." })}
       </div>
+      {field("fnsku", "FNSKU (Amazon barcode)", {
+        hint: "Filled in automatically from Amazon reports. Starts with X00, or is the ASIN for stickerless items.",
+      })}
       <div className="field">
         <label htmlFor="countUnits">New warehouse count (units)</label>
         <input

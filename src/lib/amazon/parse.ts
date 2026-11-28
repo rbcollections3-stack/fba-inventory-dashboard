@@ -116,6 +116,8 @@ export type LedgerReport = {
   periodEnd: string | null;
   /** Rows that could not be read (bad date or quantity), with their line numbers. */
   badRows: { line: number; reason: string }[];
+  /** Amazon barcode (FNSKU) per seller SKU, where the report has an FNSKU column. */
+  fnskus: Record<string, string>;
 };
 
 export type InventoryRow = {
@@ -134,13 +136,28 @@ export type InventoryReport = {
   rows: InventoryRow[];
   rowsRead: number;
   badRows: { line: number; reason: string }[];
+  fnskus: Record<string, string>;
 };
 
 export type AmazonReport = LedgerReport | InventoryReport;
 
+/** FNSKUs are 10 letters and numbers, such as X001ABC123 or, for stickerless items, the ASIN. */
+export function cleanFnsku(v: string | undefined): string | null {
+  const s = String(v ?? "").trim().toUpperCase();
+  return /^[A-Z0-9]{10}$/.test(s) ? s : null;
+}
+
+function readFnsku(fnskus: Record<string, string>, fnskuIdx: number, msku: string, cells: string[]) {
+  if (fnskuIdx < 0) return;
+  const f = cleanFnsku(cells[fnskuIdx]);
+  if (f) fnskus[msku] = f;
+}
+
 function parseLedger(t: Table): LedgerReport {
   const { idx, norm } = columnIndex(t.headers, LEDGER_REQUIRED, "FBA Inventory Ledger");
   const dispIdx = norm.indexOf("disposition");
+  const fnskuIdx = norm.indexOf("fnsku");
+  const fnskus: Record<string, string> = {};
   const sums = new Map<string, LedgerDayRow>();
   const badRows: LedgerReport["badRows"] = [];
   let start: string | null = null;
@@ -155,6 +172,7 @@ function parseLedger(t: Table): LedgerReport {
     if (!day) return void badRows.push({ line, reason: "the date could not be read" });
     if (qty === null) return void badRows.push({ line, reason: "the quantity is not a whole number" });
     if (msku === "") return void badRows.push({ line, reason: "the MSKU is blank" });
+    readFnsku(fnskus, fnskuIdx, msku, cells);
     const disposition = dispIdx >= 0 ? String(cells[dispIdx] ?? "").trim().toUpperCase() : "";
     if (start === null || day < start) start = day;
     if (end === null || day > end) end = day;
@@ -163,7 +181,7 @@ function parseLedger(t: Table): LedgerReport {
     if (prev) prev.quantity += qty;
     else sums.set(key, { msku, day, eventType, disposition, quantity: qty });
   });
-  return { kind: "ledger_detail", rows: [...sums.values()], rowsRead: t.rows.length, periodStart: start, periodEnd: end, badRows };
+  return { kind: "ledger_detail", rows: [...sums.values()], rowsRead: t.rows.length, periodStart: start, periodEnd: end, badRows, fnskus };
 }
 
 function parseInventory(t: Table): InventoryReport {
@@ -171,12 +189,15 @@ function parseInventory(t: Table): InventoryReport {
   const optional = (name: string) => norm.indexOf(name);
   const unsellableIdx = optional("afnunsellablequantity");
   const researchingIdx = optional("afnresearchingquantity");
+  const fnskuIdx = optional("fnsku");
+  const fnskus: Record<string, string> = {};
   const bySku = new Map<string, InventoryRow>();
   const badRows: InventoryReport["badRows"] = [];
   t.rows.forEach((cells, i) => {
     const line = i + 2;
     const msku = String(cells[idx.sku] ?? "").trim();
     if (msku === "") return;
+    readFnsku(fnskus, fnskuIdx, msku, cells);
     const num = (j: number) => (j < 0 ? 0 : parseIntCell(cells[j]));
     const values = {
       fulfillable: num(idx.afnfulfillablequantity),
@@ -198,7 +219,7 @@ function parseInventory(t: Table): InventoryReport {
       bySku.set(msku, { msku, ...v });
     }
   });
-  return { kind: "fba_inventory", rows: [...bySku.values()], rowsRead: t.rows.length, badRows };
+  return { kind: "fba_inventory", rows: [...bySku.values()], rowsRead: t.rows.length, badRows, fnskus };
 }
 
 /** Reads a Seller Central report's text, working out which report it is. */

@@ -35,6 +35,7 @@ export default async function EditSkuPage({ params }: PageProps<"/skus/[id]">) {
             description: sku.description ?? "",
             warehouseLocation: sku.warehouseLocation ?? "",
             asin: sku.asin ?? "",
+            fnsku: sku.fnsku ?? "",
             notes: sku.notes ?? "",
           }}
         />
