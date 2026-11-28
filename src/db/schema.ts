@@ -98,8 +98,12 @@ export const skus = pgTable(
   ],
 );
 
-/** import: SKU spreadsheet. manual: Stock counts screen. shipment: counted after an Amazon shipment left (Phase 5). */
-export const countSourceEnum = pgEnum("count_source", ["import", "manual", "shipment"]);
+/**
+ * import: SKU spreadsheet. manual: Stock counts screen. shipment: counted after
+ * an Amazon shipment left (Phase 5). china_order: counted after a China order
+ * was put away (Phase 6).
+ */
+export const countSourceEnum = pgEnum("count_source", ["import", "manual", "shipment", "china_order"]);
 
 /**
  * Warehouse on-hand counts, one row per count. The latest row per SKU is the
@@ -120,6 +124,8 @@ export const warehouseCounts = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     /** Set when the count was taken as an Amazon shipment left (Phase 5). */
     shipmentId: integer("shipment_id").references((): AnyPgColumn => shipments.id, { onDelete: "set null" }),
+    /** Set when the count was taken after a China order was received (Phase 6). */
+    chinaOrderId: integer("china_order_id").references((): AnyPgColumn => chinaOrders.id, { onDelete: "set null" }),
   },
   (t) => [
     index("warehouse_counts_sku_idx").on(t.skuId, t.createdAt),
@@ -398,3 +404,83 @@ export const seasonMonths = pgTable(
     check("season_months_percent_valid", sql`${t.percent} between 10 and 500`),
   ],
 );
+
+/**
+ * Orders placed with China suppliers (Phase 6). The admin records the order
+ * here after placing it with the supplier; units on an open order count as
+ * "on order" in the reorder-by date until the warehouse receives them.
+ * status: ordered (on the way, or partly received), received (closed: all
+ * in, or the admin said nothing more is coming), cancelled.
+ */
+export const chinaOrders = pgTable(
+  "china_orders",
+  {
+    id: serial("id").primaryKey(),
+    status: text("status").notNull().default("ordered"),
+    supplier: text("supplier"),
+    /** The supplier's order or PO number, for reference. */
+    poNumber: text("po_number"),
+    orderedOn: date("ordered_on", { mode: "string" }).notNull(),
+    /** Expected arrival at the warehouse. Starts at order date + 60 days; the admin can change it. */
+    expectedOn: date("expected_on", { mode: "string" }).notNull(),
+    note: text("note"),
+    createdBy: integer("created_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    closedAt: timestamp("closed_at", { withTimezone: true }),
+    closedBy: integer("closed_by").references(() => users.id, { onDelete: "set null" }),
+  },
+  (t) => [
+    index("china_orders_status_idx").on(t.status, t.expectedOn),
+    check("china_orders_status_valid", sql`${t.status} in ('ordered', 'received', 'cancelled')`),
+  ],
+);
+
+/** One row per SKU in a China order. Units per case are copied when the order is saved. */
+export const chinaOrderLines = pgTable(
+  "china_order_lines",
+  {
+    id: serial("id").primaryKey(),
+    orderId: integer("order_id")
+      .notNull()
+      .references(() => chinaOrders.id, { onDelete: "cascade" }),
+    skuId: integer("sku_id")
+      .notNull()
+      .references(() => skus.id, { onDelete: "cascade" }),
+    cases: integer("cases").notNull(),
+    unitsPerCase: integer("units_per_case").notNull(),
+  },
+  (t) => [
+    uniqueIndex("china_order_lines_sku_key").on(t.orderId, t.skuId),
+    index("china_order_lines_sku_idx").on(t.skuId),
+    check("china_order_lines_cases_positive", sql`${t.cases} > 0`),
+    check("china_order_lines_units_per_case_positive", sql`${t.unitsPerCase} > 0`),
+  ],
+);
+
+/**
+ * What the warehouse received against a China order, one row per SKU per
+ * delivery. An order can arrive in more than one delivery.
+ */
+export const chinaReceipts = pgTable(
+  "china_receipts",
+  {
+    id: serial("id").primaryKey(),
+    orderId: integer("order_id")
+      .notNull()
+      .references(() => chinaOrders.id, { onDelete: "cascade" }),
+    skuId: integer("sku_id")
+      .notNull()
+      .references(() => skus.id, { onDelete: "cascade" }),
+    /** Full cases that arrived in this delivery (0 if none of this SKU came). */
+    cases: integer("cases").notNull(),
+    receivedOn: date("received_on", { mode: "string" }).notNull(),
+    createdBy: integer("created_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("china_receipts_order_idx").on(t.orderId),
+    check("china_receipts_cases_nonnegative", sql`${t.cases} >= 0`),
+  ],
+);
+
+export type ChinaOrderStatus = "ordered" | "received" | "cancelled";

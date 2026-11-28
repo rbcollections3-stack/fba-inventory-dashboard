@@ -21,5 +21,5 @@ export async function freshDb(): Promise<{ db: Db; close: () => Promise<void> }>
 }
 
 export async function clearData(db: Db): Promise<void> {
-  await db.execute(sql`truncate forecast_daily_log, season_months, season_settings, shipment_lines, shipments, forecast_settings, amazon_sync_requests, fba_ledger_daily, fba_inventory_snapshots, amazon_imports, warehouse_counts, skus, listings, recovery_codes, users restart identity cascade`);
+  await db.execute(sql`truncate forecast_daily_log, season_months, season_settings, china_receipts, china_order_lines, china_orders, shipment_lines, shipments, forecast_settings, amazon_sync_requests, fba_ledger_daily, fba_inventory_snapshots, amazon_imports, warehouse_counts, skus, listings, recovery_codes, users restart identity cascade`);
 }

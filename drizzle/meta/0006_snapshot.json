@@ -1,5 +1,5 @@
 {
-  "id": "9d0e7ffa-e160-4474-a755-c5708bf411e0",
+  "id": "8abdd29c-b1ee-4c76-afeb-43ad55f902cd",
   "prevId": "3f120b52-1a8e-45bc-9f27-6628b79842b2",
   "version": "7",
   "dialect": "postgresql",
@@ -304,6 +304,374 @@
       },
       "isRLSEnabled": false
     },
+    "public.china_order_lines": {
+      "name": "china_order_lines",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "order_id": {
+          "name": "order_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "sku_id": {
+          "name": "sku_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "cases": {
+          "name": "cases",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "units_per_case": {
+          "name": "units_per_case",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "china_order_lines_sku_key": {
+          "name": "china_order_lines_sku_key",
+          "columns": [
+            {
+              "expression": "order_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "sku_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "china_order_lines_sku_idx": {
+          "name": "china_order_lines_sku_idx",
+          "columns": [
+            {
+              "expression": "sku_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "china_order_lines_order_id_china_orders_id_fk": {
+          "name": "china_order_lines_order_id_china_orders_id_fk",
+          "tableFrom": "china_order_lines",
+          "tableTo": "china_orders",
+          "columnsFrom": [
+            "order_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "china_order_lines_sku_id_skus_id_fk": {
+          "name": "china_order_lines_sku_id_skus_id_fk",
+          "tableFrom": "china_order_lines",
+          "tableTo": "skus",
+          "columnsFrom": [
+            "sku_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "china_order_lines_cases_positive": {
+          "name": "china_order_lines_cases_positive",
+          "value": "\"china_order_lines\".\"cases\" > 0"
+        },
+        "china_order_lines_units_per_case_positive": {
+          "name": "china_order_lines_units_per_case_positive",
+          "value": "\"china_order_lines\".\"units_per_case\" > 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.china_orders": {
+      "name": "china_orders",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'ordered'"
+        },
+        "supplier": {
+          "name": "supplier",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "po_number": {
+          "name": "po_number",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ordered_on": {
+          "name": "ordered_on",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "expected_on": {
+          "name": "expected_on",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "note": {
+          "name": "note",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "closed_at": {
+          "name": "closed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "closed_by": {
+          "name": "closed_by",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "china_orders_status_idx": {
+          "name": "china_orders_status_idx",
+          "columns": [
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "expected_on",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "china_orders_created_by_users_id_fk": {
+          "name": "china_orders_created_by_users_id_fk",
+          "tableFrom": "china_orders",
+          "tableTo": "users",
+          "columnsFrom": [
+            "created_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "china_orders_closed_by_users_id_fk": {
+          "name": "china_orders_closed_by_users_id_fk",
+          "tableFrom": "china_orders",
+          "tableTo": "users",
+          "columnsFrom": [
+            "closed_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "china_orders_status_valid": {
+          "name": "china_orders_status_valid",
+          "value": "\"china_orders\".\"status\" in ('ordered', 'received', 'cancelled')"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.china_receipts": {
+      "name": "china_receipts",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "order_id": {
+          "name": "order_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "sku_id": {
+          "name": "sku_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "cases": {
+          "name": "cases",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "received_on": {
+          "name": "received_on",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "china_receipts_order_idx": {
+          "name": "china_receipts_order_idx",
+          "columns": [
+            {
+              "expression": "order_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "china_receipts_order_id_china_orders_id_fk": {
+          "name": "china_receipts_order_id_china_orders_id_fk",
+          "tableFrom": "china_receipts",
+          "tableTo": "china_orders",
+          "columnsFrom": [
+            "order_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "china_receipts_sku_id_skus_id_fk": {
+          "name": "china_receipts_sku_id_skus_id_fk",
+          "tableFrom": "china_receipts",
+          "tableTo": "skus",
+          "columnsFrom": [
+            "sku_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "china_receipts_created_by_users_id_fk": {
+          "name": "china_receipts_created_by_users_id_fk",
+          "tableFrom": "china_receipts",
+          "tableTo": "users",
+          "columnsFrom": [
+            "created_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "china_receipts_cases_nonnegative": {
+          "name": "china_receipts_cases_nonnegative",
+          "value": "\"china_receipts\".\"cases\" >= 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
     "public.fba_inventory_snapshots": {
       "name": "fba_inventory_snapshots",
       "schema": "",
@@ -563,101 +931,6 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.forecast_daily_log": {
-      "name": "forecast_daily_log",
-      "schema": "",
-      "columns": {
-        "sku_id": {
-          "name": "sku_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "day": {
-          "name": "day",
-          "type": "date",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "planned_rate": {
-          "name": "planned_rate",
-          "type": "numeric(12, 4)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "rate_source": {
-          "name": "rate_source",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "season_pct": {
-          "name": "season_pct",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "out_of_stock_days": {
-          "name": "out_of_stock_days",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "forecast_daily_log_day_idx": {
-          "name": "forecast_daily_log_day_idx",
-          "columns": [
-            {
-              "expression": "day",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "forecast_daily_log_sku_id_skus_id_fk": {
-          "name": "forecast_daily_log_sku_id_skus_id_fk",
-          "tableFrom": "forecast_daily_log",
-          "tableTo": "skus",
-          "columnsFrom": [
-            "sku_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {
-        "forecast_daily_log_sku_id_day_pk": {
-          "name": "forecast_daily_log_sku_id_day_pk",
-          "columns": [
-            "sku_id",
-            "day"
-          ]
-        }
-      },
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
     "public.forecast_settings": {
       "name": "forecast_settings",
       "schema": "",
@@ -839,160 +1112,6 @@
             "id"
           ],
           "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.season_months": {
-      "name": "season_months",
-      "schema": "",
-      "columns": {
-        "listing_id": {
-          "name": "listing_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "month": {
-          "name": "month",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "percent": {
-          "name": "percent",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "updated_by": {
-          "name": "updated_by",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "season_months_listing_id_listings_id_fk": {
-          "name": "season_months_listing_id_listings_id_fk",
-          "tableFrom": "season_months",
-          "tableTo": "listings",
-          "columnsFrom": [
-            "listing_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "season_months_updated_by_users_id_fk": {
-          "name": "season_months_updated_by_users_id_fk",
-          "tableFrom": "season_months",
-          "tableTo": "users",
-          "columnsFrom": [
-            "updated_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {
-        "season_months_listing_id_month_pk": {
-          "name": "season_months_listing_id_month_pk",
-          "columns": [
-            "listing_id",
-            "month"
-          ]
-        }
-      },
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "season_months_month_valid": {
-          "name": "season_months_month_valid",
-          "value": "\"season_months\".\"month\" between 1 and 12"
-        },
-        "season_months_percent_valid": {
-          "name": "season_months_percent_valid",
-          "value": "\"season_months\".\"percent\" between 10 and 500"
-        }
-      },
-      "isRLSEnabled": false
-    },
-    "public.season_settings": {
-      "name": "season_settings",
-      "schema": "",
-      "columns": {
-        "listing_id": {
-          "name": "listing_id",
-          "type": "integer",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "enabled": {
-          "name": "enabled",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": true
-        },
-        "updated_by": {
-          "name": "updated_by",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "season_settings_listing_id_listings_id_fk": {
-          "name": "season_settings_listing_id_listings_id_fk",
-          "tableFrom": "season_settings",
-          "tableTo": "listings",
-          "columnsFrom": [
-            "listing_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "season_settings_updated_by_users_id_fk": {
-          "name": "season_settings_updated_by_users_id_fk",
-          "tableFrom": "season_settings",
-          "tableTo": "users",
-          "columnsFrom": [
-            "updated_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
           "onUpdate": "no action"
         }
       },
@@ -1634,6 +1753,12 @@
           "type": "integer",
           "primaryKey": false,
           "notNull": false
+        },
+        "china_order_id": {
+          "name": "china_order_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {
@@ -1698,6 +1823,19 @@
           ],
           "onDelete": "set null",
           "onUpdate": "no action"
+        },
+        "warehouse_counts_china_order_id_china_orders_id_fk": {
+          "name": "warehouse_counts_china_order_id_china_orders_id_fk",
+          "tableFrom": "warehouse_counts",
+          "tableTo": "china_orders",
+          "columnsFrom": [
+            "china_order_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -1735,7 +1873,8 @@
       "values": [
         "import",
         "manual",
-        "shipment"
+        "shipment",
+        "china_order"
       ]
     },
     "public.user_role": {
