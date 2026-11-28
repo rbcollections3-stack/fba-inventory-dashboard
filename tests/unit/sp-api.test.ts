@@ -131,6 +131,7 @@ describe("ledger dates", () => {
       periodStart: "2026-10-26",
       periodEnd: "2026-11-27",
       badRows: [],
+      fnskus: {},
     };
     const t = trimLedger(report, "2026-10-27", "2026-11-26");
     expect(t.rows.map((r) => r.day)).toEqual(["2026-10-27", "2026-11-25"]);

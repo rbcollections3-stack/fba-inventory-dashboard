@@ -27,6 +27,7 @@ export default async function NewSkuPage() {
             description: "",
             warehouseLocation: "",
             asin: "",
+            fnsku: "",
             notes: "",
           }}
         />

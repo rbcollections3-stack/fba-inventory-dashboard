@@ -59,11 +59,13 @@ describe("pallet build steps", () => {
     expect(steps).toEqual([
       "Take one empty pallet to the pallet area. This pallet is for 7004 only. Do not put any other product on it.",
       "Go to the shelf labelled 7004. Bring 19 cases to the pallet. Check that every case label says 7004.",
+      "Stick one Amazon box label on the side of each case, not on the top or on a seam. Use only the box labels printed for this pallet.",
       "Put 6 cases flat on the pallet to make the first layer. Line the cases up with the edges of the pallet. Nothing should hang over the edge.",
       "Stack 2 more layers of 6 cases on top, one layer at a time, each layer the same as the first. You now have 3 layers and 18 cases.",
       "Put the last 1 case on top, in the middle of the pallet.",
       "Count the cases on the pallet. You should have 19. If you do not, stop and tell your supervisor.",
-      "Wrap the pallet and attach the pallet labels.",
+      "Wrap the whole pallet in stretch wrap.",
+      "Stick the 4 Amazon pallet labels on the outside of the wrap, one in the middle of each of the 4 sides, about halfway up.",
     ]);
   });
 

@@ -50,6 +50,32 @@ async function skuMatcher(db: Db) {
   };
 }
 
+/**
+ * Copies each tracked SKU's Amazon barcode (FNSKU) from a report, so labels
+ * can be printed. The Manage FBA Inventory report is today's list, so it
+ * always wins; the ledger holds past days, so it only fills a blank.
+ */
+async function saveFnskus(
+  tx: Pick<Db, "update">,
+  fnskus: Record<string, string>,
+  match: (msku: string) => number | undefined,
+  onlyIfBlank: boolean,
+) {
+  for (const [msku, fnsku] of Object.entries(fnskus)) {
+    const skuId = match(msku);
+    if (skuId === undefined) continue;
+    await tx
+      .update(skus)
+      .set({ fnsku })
+      .where(
+        and(
+          eq(skus.id, skuId),
+          onlyIfBlank ? sql`${skus.fnsku} is null` : sql`${skus.fnsku} is distinct from ${fnsku}`,
+        ),
+      );
+  }
+}
+
 function untrackedList(mskus: Iterable<string>): string[] {
   return [...new Set(mskus)].filter((m) => !m.toLowerCase().startsWith("amzn.gr.")).sort();
 }
@@ -79,6 +105,7 @@ export async function saveLedgerReport(db: Db, report: LedgerReport, meta: SaveM
         createdBy: meta.userId,
       })
       .returning({ id: amazonImports.id });
+    await saveFnskus(tx as unknown as Db, report.fnskus ?? {}, match, true);
 
     // A newer report replaces what was saved before for the same SKUs and days,
     // so uploading overlapping date ranges never counts a sale twice.
@@ -147,6 +174,7 @@ export async function saveInventoryReport(db: Db, report: InventoryReport, meta:
         createdBy: meta.userId,
       })
       .returning({ id: amazonImports.id });
+    await saveFnskus(tx as unknown as Db, report.fnskus ?? {}, match, false);
 
     // A tracked SKU missing from the report has no FBA stock and nothing
     // inbound, so it gets a row of zeros rather than keeping an old number.

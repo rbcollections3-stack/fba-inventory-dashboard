@@ -40,6 +40,7 @@ export async function saveSkuAction(
       "description",
       "warehouseLocation",
       "asin",
+      "fnsku",
       "notes",
     ].map((k) => [k, String(formData.get(k) ?? "")]),
   );

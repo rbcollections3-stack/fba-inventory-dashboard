@@ -4,8 +4,10 @@ import { gunzipSync } from "node:zlib";
  * A small, read-only client for Amazon's Selling Partner API (SP-API).
  *
  * It can only request and download the two FBA reports the app reads (see
- * ALLOWED_REPORT_TYPES). It never changes anything in Seller Central and never
- * asks for reports with customer names or addresses.
+ * ALLOWED_REPORT_TYPES), and look up (GET only) an inbound shipment the owner
+ * already created in Seller Central so its box and pallet labels can be
+ * printed (see INBOUND_READ_PATHS). It never changes anything in Seller
+ * Central and never asks for anything with customer names or addresses.
  *
  * The three keys come from environment variables set in Vercel by the owner:
  * SP_API_CLIENT_ID, SP_API_CLIENT_SECRET, SP_API_REFRESH_TOKEN. They are never
@@ -30,6 +32,24 @@ const ENDPOINTS = {
   eu: "https://sellingpartnerapi-eu.amazon.com",
   fe: "https://sellingpartnerapi-fe.amazon.com",
 } as const;
+
+/**
+ * Fulfillment Inbound paths the app may read, all GET: find the shipment and
+ * its boxes (2024-03-20 API) and download Amazon's labels for it (v0 getLabels).
+ */
+const INBOUND_READ_PATHS = [
+  /^\/inbound\/fba\/2024-03-20\/inboundPlans$/,
+  /^\/inbound\/fba\/2024-03-20\/inboundPlans\/[A-Za-z0-9-]+$/,
+  /^\/inbound\/fba\/2024-03-20\/inboundPlans\/[A-Za-z0-9-]+\/shipments\/[A-Za-z0-9-]+$/,
+  /^\/inbound\/fba\/2024-03-20\/inboundPlans\/[A-Za-z0-9-]+\/shipments\/[A-Za-z0-9-]+\/boxes$/,
+  /^\/fba\/inbound\/v0\/shipments\/[A-Z0-9]+\/labels$/,
+];
+
+export function isAllowedCall(method: string, pathWithQuery: string): boolean {
+  const path = pathWithQuery.split("?")[0];
+  if (path.startsWith("/reports/2021-06-30/")) return true;
+  return method === "GET" && INBOUND_READ_PATHS.some((re) => re.test(path));
+}
 
 const TOKEN_URL = "https://api.amazon.com/auth/o2/token";
 
@@ -146,8 +166,8 @@ export class SpApiClient implements ReportsClient {
   }
 
   private async call<T>(method: "GET" | "POST", path: string, body?: unknown): Promise<T> {
-    // Only the Reports API is ever called.
-    if (!path.startsWith("/reports/2021-06-30/")) throw new SpApiError("Blocked: the app only reads reports.");
+    // Only reports, and reading inbound shipments and their labels, are ever called.
+    if (!isAllowedCall(method, path)) throw new SpApiError("Blocked: the app only reads from Amazon.");
     const res = await this.fetchFn(this.config.endpoint + path, {
       method,
       headers: {
@@ -161,6 +181,23 @@ export class SpApiClient implements ReportsClient {
     const text = await res.text();
     if (!res.ok) throw new SpApiError(explain(res.status, text), res.status);
     return JSON.parse(text) as T;
+  }
+
+  /** A read-only Fulfillment Inbound call (see INBOUND_READ_PATHS). */
+  async inboundGet<T>(path: string, query: Record<string, string | number | undefined> = {}): Promise<T> {
+    const q = new URLSearchParams();
+    for (const [k, v] of Object.entries(query)) if (v !== undefined) q.set(k, String(v));
+    const qs = q.toString();
+    return this.call<T>("GET", qs ? `${path}?${qs}` : path);
+  }
+
+  /** Downloads a label file from the short-lived Amazon link that getLabels returns. */
+  async downloadFile(url: string): Promise<{ bytes: ArrayBuffer; contentType: string }> {
+    // The link comes from Amazon's own answer; only plain https links are followed.
+    if (!/^https:\/\/[^/\s]+\//.test(url)) throw new SpApiError("Blocked: unexpected label link.");
+    const res = await this.fetchFn(url);
+    if (!res.ok) throw new SpApiError(`Downloading the labels from Amazon failed (${res.status}).`, res.status);
+    return { bytes: await res.arrayBuffer(), contentType: res.headers.get("content-type") ?? "application/pdf" };
   }
 
   async createReport(reportType: ReportType, range?: { start: Date; end: Date }): Promise<string> {

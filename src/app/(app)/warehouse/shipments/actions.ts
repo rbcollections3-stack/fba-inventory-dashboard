@@ -6,6 +6,7 @@ import { getDb } from "@/db";
 import { requireAdmin, requireUser } from "@/lib/auth/session";
 import { businessToday } from "@/lib/dates";
 import { cancelShipment, getShipment, markShipmentSent, setAmazonShipmentId } from "@/lib/shipments/repo";
+import { readShipmentIds } from "@/lib/labels/amazon";
 import { readCountForm, type CountIssue } from "@/lib/warehouse/counts";
 
 export type SendState = { error?: string; issues?: CountIssue[] } | null;
@@ -39,7 +40,9 @@ export async function cancelShipmentAction(id: number): Promise<void> {
 
 export async function saveAmazonIdAction(id: number, formData: FormData): Promise<void> {
   await requireAdmin();
-  const value = String(formData.get("amazonShipmentId") ?? "").trim().slice(0, 40);
-  await setAmazonShipmentId(getDb(), id, value || null);
+  const { ids, bad } = readShipmentIds(String(formData.get("amazonShipmentId") ?? "").slice(0, 400));
+  if (bad.length > 0) redirect(`/warehouse/shipments/${id}?idError=1`);
+  await setAmazonShipmentId(getDb(), id, ids.length > 0 ? ids.join(", ") : null);
   refresh(id);
+  for (const p of [`/warehouse/shipments/${id}/labels`]) revalidatePath(p);
 }

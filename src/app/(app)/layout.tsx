@@ -20,6 +20,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             {isAdmin && <Link href="/amazon">Amazon reports</Link>}
             <Link href="/warehouse">Warehouse</Link>
             <Link href="/warehouse/shipments">Pallet sheets</Link>
+            <Link href="/warehouse/labels">Barcode labels</Link>
             <Link href="/warehouse/counts">Stock counts</Link>
             {isAdmin && <Link href="/accounts">Accounts</Link>}
           </nav>

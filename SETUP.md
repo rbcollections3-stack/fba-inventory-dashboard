@@ -103,9 +103,11 @@ the last 31 days of daily sales from Amazon every morning, so you no longer
 need to download and upload reports. Uploading still works as a backup.
 
 The connection is **read-only**. The app can only ask Amazon for two reports,
-Manage FBA Inventory and the Inventory Ledger (detailed view). It cannot change
-listings, prices, shipments or anything else, and it never asks for customer
-names or addresses. Your app in Seller Central needs the **Amazon Fulfillment**
+Manage FBA Inventory and the Inventory Ledger (detailed view), and look up a
+shipment you already created in Seller Central to print its box and pallet
+labels (see section 6). It cannot create or change listings, prices,
+shipments or anything else, and it never asks for customer names or
+addresses. Your app in Seller Central needs the **Amazon Fulfillment**
 role ticked.
 
 You need the three keys you saved in your password manager: the **Client ID**,
@@ -155,6 +157,33 @@ The common ones:
 Optional settings `SP_API_MARKETPLACE_ID` (default `ATVPDKIKX0DER`, US) and
 `SP_API_REGION` (default `na`) exist so another marketplace can be added
 later without a rewrite.
+
+## 6. Printing labels (Rollo printer)
+
+**Barcode stickers (FNSKU), 2.25 x 1.25 inch labels.** Each SKU's Amazon
+barcode (starts with X00) is copied from Amazon's reports automatically, and
+can also be typed on the SKU's edit screen. Staff open **Barcode labels**, type
+how many stickers they need and press **Print**, or use the "Barcode stickers"
+link under each SKU on a shipment's pick list. In the print window choose the
+Rollo, paper size 2.25 x 1.25 in, margins None, scale 100%.
+
+**Amazon box and pallet labels, 4x6 labels.** Amazon only makes these once
+the shipment exists in Seller Central, so:
+
+1. Plan the shipment in the app (**Ship to Amazon**) as usual.
+2. Create the same shipment in Seller Central (**Send to Amazon**): one case
+   pack per SKU, the same number of cases.
+3. Copy Amazon's shipment ID (starts with FBA) into the **Amazon shipment ID**
+   box on the shipment's pallet sheets page and press Save. If Amazon split
+   the shipment between warehouses, type every ID with commas between them.
+4. Staff press **Amazon box and pallet labels**. The app finds the shipment's
+   boxes in Amazon and lists, for each pallet, a **Box labels** button with
+   exactly that pallet's labels, then a **Pallet labels** button (4 per
+   pallet). Print on the Rollo with 4x6 labels, scale 100%.
+
+If Amazon's numbers differ from the pallet sheets (Amazon sends a SKU to two
+warehouses, or expects a different number of cases), the page says so in a
+yellow box before anything is printed.
 
 ## Costs and the "database not publicly reachable" question
 

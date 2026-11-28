@@ -84,6 +84,7 @@ export type ShipmentLineView = {
   skuId: number;
   amazonSku: string;
   inhouseSku: string;
+  fnsku: string | null;
   description: string | null;
   warehouseLocation: string | null;
   listingName: string;
@@ -103,6 +104,7 @@ export type ShipmentView = {
   id: number;
   status: ShipmentStatus;
   amazonShipmentId: string | null;
+  amazonLookup: Record<string, { inboundPlanId: string; shipmentId: string }> | null;
   note: string | null;
   createdAt: Date;
   createdBy: string | null;
@@ -124,6 +126,7 @@ async function loadShipments(db: Db, where: ReturnType<typeof eq> | undefined, l
       id: shipments.id,
       status: shipments.status,
       amazonShipmentId: shipments.amazonShipmentId,
+      amazonLookup: shipments.amazonLookup,
       note: shipments.note,
       createdAt: shipments.createdAt,
       createdBy: creator.username,
@@ -159,6 +162,7 @@ async function loadShipments(db: Db, where: ReturnType<typeof eq> | undefined, l
           skuId: l.skuId,
           amazonSku: s.amazonSku,
           inhouseSku: s.inhouseSku,
+          fnsku: s.fnsku,
           description: s.description,
           warehouseLocation: s.warehouseLocation,
           listingName: s.listingName,
@@ -304,4 +308,13 @@ export async function cancelShipment(db: Db, id: number, userId: number | null):
 
 export async function setAmazonShipmentId(db: Db, id: number, value: string | null): Promise<void> {
   await db.update(shipments).set({ amazonShipmentId: value?.trim() || null }).where(eq(shipments.id, id));
+}
+
+/** Remembers where Amazon keeps each shipment ID, so label lookups are quick next time. */
+export async function saveAmazonLookup(
+  db: Db,
+  id: number,
+  lookup: Record<string, { inboundPlanId: string; shipmentId: string }>,
+): Promise<void> {
+  await db.update(shipments).set({ amazonLookup: lookup }).where(eq(shipments.id, id));
 }

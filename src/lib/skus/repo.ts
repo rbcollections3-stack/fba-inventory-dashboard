@@ -17,6 +17,7 @@ export type SkuWithStock = {
   description: string | null;
   warehouseLocation: string | null;
   asin: string | null;
+  fnsku: string | null;
   notes: string | null;
   warehouseOnHand: number | null;
   countedOn: string | null;
@@ -48,6 +49,7 @@ export async function listSkus(db: Db): Promise<SkuWithStock[]> {
       description: skus.description,
       warehouseLocation: skus.warehouseLocation,
       asin: skus.asin,
+      fnsku: skus.fnsku,
       notes: skus.notes,
       warehouseOnHand: latest.units,
       countedOn: latest.countedOn,
@@ -229,6 +231,13 @@ export const skuFormSchema = z.object({
     .toUpperCase()
     .refine((s) => s === "" || /^[A-Z0-9]{10}$/.test(s), "ASIN must be 10 letters and numbers.")
     .transform((s) => s || null),
+  fnsku: z
+    .string()
+    .default("")
+    .transform((s) => s.trim())
+    .transform((s) => s.toUpperCase())
+    .refine((s) => s === "" || /^[A-Z0-9]{10}$/.test(s), "FNSKU must be 10 letters and numbers, such as X001ABC123.")
+    .transform((s) => s || null),
   notes: z.string().trim().max(2000).transform((s) => s || null),
 });
 
@@ -272,6 +281,7 @@ export async function saveSku(db: Db, id: number | null, v: SkuFormValues): Prom
         description: v.description,
         warehouseLocation: v.warehouseLocation,
         asin: v.asin,
+        fnsku: v.fnsku,
         notes: v.notes,
       };
       if (id === null) {

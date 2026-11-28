@@ -23,6 +23,9 @@ export default async function WarehousePage() {
           <Link className="button" href="/warehouse/shipments">
             All shipments
           </Link>
+          <Link className="button" href="/warehouse/labels">
+            Barcode labels
+          </Link>
           <Link className="button primary" href="/warehouse/counts">
             Enter stock counts
           </Link>

@@ -49,6 +49,16 @@ describe.skipIf(!TEST_DATABASE_URL)("Amazon reports (database)", () => {
     expect(stock.size).toBe(21);
   });
 
+  it("copies each tracked SKU's FNSKU for barcode labels, the inventory report winning over the ledger", async () => {
+    await saveAmazonReport(db, await fixture("ledger-detail-sample.tsv"), upload);
+    expect((await listSkus(db)).find((s) => s.amazonSku === "EX-TOTE-BLK")?.fnsku).toBe("X000EXAMPL");
+    await saveAmazonReport(db, await fixture("fba-inventory-sample.txt"), upload);
+    await saveAmazonReport(db, await fixture("ledger-detail-sample.tsv"), upload);
+    const bySku = new Map((await listSkus(db)).map((s) => [s.amazonSku, s.fnsku]));
+    expect(bySku.get("EX-TOTE-BLK")).toBe("X000EXAMP1");
+    expect(bySku.get("EX-TOTE-NAT")).toBe("X000EXAMP2");
+  });
+
   it("shows the newest FBA stock after a second upload", async () => {
     await saveAmazonReport(db, await fixture("fba-inventory-sample.txt"), { ...upload, asOf: new Date("2026-11-20T00:00:00Z") });
     const newer = (await fixture("fba-inventory-sample.txt")).replace(/^EX-TOTE-BLK(\t[^\t]*){9}\t240/m, (m) => m.replace(/240$/, "199"));

@@ -76,6 +76,11 @@ export function palletSteps(inhouseSku: string, layout: PalletLayout): Step[] {
     { b: inhouseSku },
     ".",
   ]);
+  steps.push([
+    "Stick one Amazon ",
+    { b: "box label" },
+    " on the side of each case, not on the top or on a seam. Use only the box labels printed for this pallet.",
+  ]);
 
   if (fullLayers === 0) {
     // Fewer cases than one layer.
@@ -112,7 +117,12 @@ export function palletSteps(inhouseSku: string, layout: PalletLayout): Step[] {
     { b: String(cases) },
     ". If you do not, stop and tell your supervisor.",
   ]);
-  steps.push(["Wrap the pallet and attach the pallet labels."]);
+  steps.push(["Wrap the whole pallet in stretch wrap."]);
+  steps.push([
+    "Stick the ",
+    { b: "4 Amazon pallet labels" },
+    " on the outside of the wrap, one in the middle of each of the 4 sides, about halfway up.",
+  ]);
   return steps;
 }
 
