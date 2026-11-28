@@ -211,3 +211,63 @@ td.notes ul { margin: 0; padding-left: 16px; }
 table.forecast th { white-space: normal; vertical-align: bottom; max-width: 110px; }
 table.forecast td { padding: 8px; }
 table.forecast td.notes { min-width: 200px; max-width: 280px; }
+
+/* Phase 5: ship to Amazon and pallet build sheets */
+h3 { font-size: 1rem; margin: 16px 0 8px; }
+button.danger { color: var(--danger); border-color: var(--danger); }
+.warn-text { color: var(--warn); white-space: normal; }
+.big-check { width: 22px; height: 22px; }
+tr.row-picked td { background: #f3f7fd; }
+.plan-table td { vertical-align: middle; }
+.plan-table td.notes { min-width: 200px; }
+.admin-tools { display: flex; gap: 16px; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; }
+.inline-form { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.inline-form label { font-weight: 600; font-size: 0.9rem; }
+.inline-form input { width: 200px; }
+
+.pick-list, .pallet-sheet { font-size: 17px; }
+.sheet-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 8px; }
+.sheet-pallet-no { font-size: 1.5rem; font-weight: 800; }
+.sheet-cases { text-align: center; border: 3px solid var(--text); border-radius: 10px; padding: 4px 16px; min-width: 110px; }
+.big-number { font-size: 2.6rem; font-weight: 800; line-height: 1.1; }
+.sheet-sku { border-top: 2px solid var(--text); border-bottom: 2px solid var(--text); padding: 10px 0; margin-bottom: 12px; }
+.sheet-inhouse { font-size: 3rem; font-weight: 900; letter-spacing: 0.03em; line-height: 1.1; word-break: break-word; }
+.sheet-body { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 20px; align-items: start; }
+@media (max-width: 760px) { .sheet-body { grid-template-columns: 1fr; } }
+.sheet-facts { display: grid; grid-template-columns: auto 1fr; gap: 2px 16px; margin: 0 0 12px; }
+.sheet-facts dt { color: var(--muted); }
+.sheet-facts dd { margin: 0; font-weight: 700; }
+ol.sheet-steps { margin: 0; padding-left: 28px; display: grid; gap: 10px; line-height: 1.5; }
+ol.sheet-steps li::marker { font-weight: 800; }
+.stack-drawing { border: 1px solid var(--border); border-radius: 8px; padding: 10px; display: grid; gap: 3px; }
+.stack-layer { display: grid; grid-template-columns: 58px 1fr 58px; gap: 6px; align-items: center; font-size: 0.75rem; }
+.stack-label { color: var(--muted); }
+.stack-count { text-align: right; font-weight: 600; }
+.stack-boxes { display: grid; gap: 2px; }
+.stack-boxes .box { height: 18px; background: #c99a5b; border: 1px solid #7a5523; border-radius: 2px; }
+.stack-boxes .box.empty { background: transparent; border: 1px dashed var(--border); }
+.stack-pallet { margin: 2px 0 0 64px; margin-right: 64px; text-align: center; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.2em; color: #fff; background: #6b4f2a; border-radius: 2px; padding: 2px 0; }
+.signoff { display: flex; gap: 24px; flex-wrap: wrap; margin-top: 20px; padding-top: 12px; border-top: 1px solid var(--border); }
+.signoff .line { display: inline-block; width: 200px; border-bottom: 1px solid var(--text); margin-left: 6px; height: 1.1em; }
+.signoff .line.short { width: 110px; }
+.pick-table td { white-space: normal; }
+.pick-table tfoot td { font-weight: 700; border-bottom: none; }
+
+@media print {
+  @page { size: letter portrait; margin: 12mm; }
+  main.page { max-width: none; padding: 0; }
+  .card { border: none; padding: 0; margin: 0; }
+  .alert { border: 1px solid #000; background: #fff !important; color: #000 !important; }
+  .pallet-sheet { break-before: page; page-break-before: always; }
+  .pick-list, .pallet-sheet { font-size: 12.5pt; }
+  .pallet-sheet { break-inside: avoid; page-break-inside: avoid; }
+  .sheet-inhouse { font-size: 36pt; }
+  ol.sheet-steps { gap: 6px; line-height: 1.4; }
+  .signoff { margin-top: 14px; break-inside: avoid; }
+  .stack-layer { font-size: 9pt; }
+  .stack-boxes .box { height: 16px; }
+  .stack-boxes .box { background: #ddd; border-color: #000; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .stack-pallet { background: #000; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .sheet-body { grid-template-columns: minmax(0, 1fr) 230px; }
+  tr.row-picked td { background: none; }
+}

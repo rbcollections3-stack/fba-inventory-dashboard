@@ -34,11 +34,16 @@ export default async function SkuForecastPage({ params }: PageProps<"/overview/[
       `${fmtRate(rate)} a day`,
     ]);
   }
+  const onTheWay = r.fba
+    ? r.sentNotInReport > 0
+      ? `${fmtInt(r.fba.inbound + r.sentNotInReport)} on the way (${fmtInt(r.fba.inbound)} in Amazon's report + ${fmtInt(r.sentNotInReport)} sent since)`
+      : `${fmtInt(r.fba.inbound)} on the way`
+    : "";
   if (rate !== null && r.fba && stockDay && f.fbaCoverDays !== null && f.totalCoverDays !== null) {
     steps.push(
       [
         "FBA cover",
-        `(${fmtInt(r.fba.fulfillable)} available + ${fmtInt(r.fba.inbound)} on the way) / ${fmtRate(rate)}`,
+        `(${fmtInt(r.fba.fulfillable)} available + ${onTheWay}) / ${fmtRate(rate)}`,
         `${fmtDays(f.fbaCoverDays)} days`,
       ],
       [
@@ -53,7 +58,7 @@ export default async function SkuForecastPage({ params }: PageProps<"/overview/[
       ],
       [
         "Total cover",
-        `(${fmtInt(r.fba.fulfillable)} + ${fmtInt(r.fba.inbound)} + ${
+        `(${fmtInt(r.fba.fulfillable)} + ${fmtInt(r.fba.inbound + r.sentNotInReport)} + ${
           r.warehouseOnHand === null ? "0 warehouse, not counted" : `${fmtInt(r.warehouseOnHand)} warehouse`
         } + 0 on order) / ${fmtRate(rate)}`,
         `${fmtDays(f.totalCoverDays)} days`,

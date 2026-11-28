@@ -43,13 +43,18 @@ export default async function OverviewPage({ searchParams }: PageProps<"/overvie
             out or to enter expected daily sales.
           </p>
         </div>
-        <div className="toggle" role="group" aria-label="Sort">
-          <Link href="/overview" aria-current={!byListing}>
-            Most urgent first
+        <div className="actions">
+          <Link className="button primary" href="/shipments">
+            Plan a shipment to Amazon
           </Link>
-          <Link href="/overview?view=listing" aria-current={byListing}>
-            By listing
-          </Link>
+          <div className="toggle" role="group" aria-label="Sort">
+            <Link href="/overview" aria-current={!byListing}>
+              Most urgent first
+            </Link>
+            <Link href="/overview?view=listing" aria-current={byListing}>
+              By listing
+            </Link>
+          </div>
         </div>
       </div>
 
@@ -180,7 +185,14 @@ function ForecastRow({ r, showListing }: { r: SkuForecast; showListing: boolean 
         {fmtInt(r.fba?.fulfillable)}
         {!!r.fba?.reserved && <span className="subtle" title="Held by Amazon; not counted as available">+{fmtInt(r.fba.reserved)} reserved</span>}
       </td>
-      <td className="num">{fmtInt(r.fba?.inbound)}</td>
+      <td className="num">
+        {r.fba ? fmtInt(r.fba.inbound + r.sentNotInReport) : "-"}
+        {r.sentNotInReport > 0 && (
+          <span className="subtle" title="Marked sent in this app; Amazon's next report will include it">
+            incl. {fmtInt(r.sentNotInReport)} just sent
+          </span>
+        )}
+      </td>
       <td className="num">
         {r.warehouseOnHand === null ? <span className="muted">not counted</span> : fmtInt(r.warehouseOnHand)}
       </td>

@@ -75,7 +75,10 @@ export default async function CountsPage() {
                   <td>{h.countedOn}</td>
                   <td>{label.get(h.skuId) ?? "-"}</td>
                   <td className="num">{h.units.toLocaleString("en-US")}</td>
-                  <td>{h.source === "import" ? "SKU spreadsheet" : (h.by ?? "-")}</td>
+                  <td>
+                    {h.source === "import" ? "SKU spreadsheet" : (h.by ?? "-")}
+                    {h.source === "shipment" && <span className="subtle">after shipment #{h.shipmentId ?? "?"} left</span>}
+                  </td>
                 </tr>
               ))}
             </tbody>
